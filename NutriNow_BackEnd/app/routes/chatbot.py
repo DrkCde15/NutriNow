@@ -11,6 +11,7 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 from app.database import get_db
 from app.security import check_rate_limit, rate_limit_response
 from app.services.agent_service import clear_session_agent, get_agent
+from app.services.account_cache import get_cached_account
 
 logger = logging.getLogger(__name__)
 chatbot_bp = Blueprint("chatbot", __name__)
@@ -110,6 +111,10 @@ def _validated_image_extension(file):
 
 
 def _get_user_email(user_id):
+    account = get_cached_account(user_id)
+    if account and account.get("email"):
+        return account["email"]
+
     with get_db() as (cursor, conn):
         cursor.execute("SELECT email FROM usuarios WHERE id=%s", (user_id,))
         user_data = cursor.fetchone()
@@ -121,56 +126,85 @@ def _build_session_summaries(user_id, limit=50):
         cursor.execute(
             """
             SELECT
-                session_id,
-                MIN(timestamp) AS created_at,
-                MAX(timestamp) AS updated_at,
-                COUNT(*) AS message_count
-            FROM chat_history
-            WHERE user_id = %s AND session_id IS NOT NULL AND session_id != ''
-            GROUP BY session_id
-            ORDER BY updated_at DESC
-            LIMIT %s
+                grouped.session_id,
+                grouped.created_at,
+                grouped.updated_at,
+                grouped.message_count,
+                (
+                    SELECT ch.content
+                    FROM chat_history ch
+                    WHERE ch.user_id = %s
+                      AND ch.session_id = grouped.session_id
+                      AND ch.message_type = 'human'
+                      AND CHAR_LENGTH(TRIM(ch.content)) > 5
+                    ORDER BY ch.timestamp ASC, ch.id ASC
+                    LIMIT 1
+                ) AS title_candidate,
+                (
+                    SELECT ch.content
+                    FROM chat_history ch
+                    WHERE ch.user_id = %s
+                      AND ch.session_id = grouped.session_id
+                      AND ch.message_type = 'human'
+                    ORDER BY ch.timestamp ASC, ch.id ASC
+                    LIMIT 1
+                ) AS first_human_message,
+                (
+                    SELECT ch.content
+                    FROM chat_history ch
+                    WHERE ch.user_id = %s
+                      AND ch.session_id = grouped.session_id
+                    ORDER BY ch.timestamp ASC, ch.id ASC
+                    LIMIT 1
+                ) AS first_message,
+                (
+                    SELECT ch.content
+                    FROM chat_history ch
+                    WHERE ch.user_id = %s
+                      AND ch.session_id = grouped.session_id
+                    ORDER BY ch.timestamp DESC, ch.id DESC
+                    LIMIT 1
+                ) AS last_message
+            FROM (
+                SELECT
+                    session_id,
+                    MIN(timestamp) AS created_at,
+                    MAX(timestamp) AS updated_at,
+                    COUNT(*) AS message_count
+                FROM chat_history
+                WHERE user_id = %s AND session_id IS NOT NULL AND session_id != ''
+                GROUP BY session_id
+                ORDER BY updated_at DESC
+                LIMIT %s
+            ) grouped
+            ORDER BY grouped.updated_at DESC
             """,
-            (user_id, limit),
-        )
-        grouped = cursor.fetchall() or []
-
-        if not grouped:
-            return []
-
-        session_ids = [row["session_id"] for row in grouped]
-        placeholders = ", ".join(["%s"] * len(session_ids))
-        cursor.execute(
-            f"""
-            SELECT session_id, message_type, content, timestamp
-            FROM chat_history
-            WHERE user_id = %s AND session_id IN ({placeholders})
-            ORDER BY timestamp ASC, id ASC
-            """,
-            tuple([user_id, *session_ids]),
+            (user_id, user_id, user_id, user_id, user_id, limit),
         )
         rows = cursor.fetchall() or []
 
-    messages_by_session = {}
-    for row in rows:
-        messages_by_session.setdefault(row["session_id"], []).append(row)
-
     sessions = []
-    for row in grouped:
-        session_id = row["session_id"]
-        messages = messages_by_session.get(session_id, [])
-        human_messages = [m for m in messages if m["message_type"] == "human"]
-        title_source = next((m["content"] for m in human_messages if not _is_generic_chat_message(m["content"])), None)
-        if not title_source and human_messages:
-            title_source = human_messages[0]["content"]
-        if not title_source and messages:
-            title_source = messages[0]["content"]
+    for row in rows:
+        title_source = next(
+            (
+                candidate
+                for candidate in (
+                    row.get("title_candidate"),
+                    row.get("first_human_message"),
+                    row.get("first_message"),
+                )
+                if candidate and not _is_generic_chat_message(candidate)
+            ),
+            None,
+        )
+        if not title_source:
+            title_source = row.get("first_human_message") or row.get("first_message") or "Nova conversa"
 
-        last_message = messages[-1]["content"] if messages else ""
+        last_message = row.get("last_message") or ""
 
         sessions.append(
             {
-                "session_id": session_id,
+                "session_id": row["session_id"],
                 "title": _truncate_text(title_source or "Nova conversa", 72),
                 "preview": _truncate_text(last_message, 120),
                 "created_at": _serialize_timestamp(row["created_at"]),

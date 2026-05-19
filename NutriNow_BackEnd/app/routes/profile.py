@@ -352,24 +352,17 @@ def get_dashboard():
 
             cursor.execute(
                 f"""
-                SELECT COUNT(*) AS total
+                SELECT
+                    COALESCE(SUM(created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)), 0) AS recent_plans,
+                    COALESCE(SUM(tipo = 'treino'), 0) AS total_treinos
                 FROM dieta_treino
                 WHERE {dieta_user_column} = %s
-                  AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
                 """,
                 (user_id,),
             )
-            recent_plan_count = (cursor.fetchone() or {}).get("total", 0) or 0
-
-            cursor.execute(
-                f"""
-                SELECT COUNT(*) AS total
-                FROM dieta_treino
-                WHERE {dieta_user_column} = %s AND tipo = 'treino'
-                """,
-                (user_id,),
-            )
-            treino_count = (cursor.fetchone() or {}).get("total", 0) or 0
+            plan_stats = cursor.fetchone() or {}
+            recent_plan_count = int(plan_stats.get("recent_plans", 0) or 0)
+            treino_count = int(plan_stats.get("total_treinos", 0) or 0)
 
             cursor.execute(
                 """
@@ -388,7 +381,7 @@ def get_dashboard():
                 SELECT tipo, title, description, created_at, updated_at
                 FROM dieta_treino
                 WHERE {dieta_user_column} = %s
-                ORDER BY COALESCE(updated_at, created_at) DESC
+                ORDER BY updated_at DESC, created_at DESC
                 LIMIT 40
                 """,
                 (user_id,),

@@ -7,7 +7,7 @@ _cache_lock = Lock()
 
 
 def _ttl_seconds():
-    return int(os.getenv("USER_ACCOUNT_CACHE_SECONDS", "20"))
+    return int(os.getenv("USER_ACCOUNT_CACHE_SECONDS", "120"))
 
 
 def get_cached_account(user_id):
