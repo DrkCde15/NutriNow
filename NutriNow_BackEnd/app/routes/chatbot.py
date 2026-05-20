@@ -12,14 +12,17 @@ from app.database import get_db
 from app.security import check_rate_limit, rate_limit_response
 from app.services.agent_service import clear_session_agent, get_agent
 from app.services.account_cache import get_cached_account
+from app.services.runtime_cache import TTLCache
 
 logger = logging.getLogger(__name__)
 chatbot_bp = Blueprint("chatbot", __name__)
 
 SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 CHAT_MESSAGE_MAX_CHARS = int(os.getenv("CHAT_MESSAGE_MAX_CHARS", "8000"))
+CHAT_SESSIONS_CACHE_SECONDS = int(os.getenv("CHAT_SESSIONS_CACHE_SECONDS", "12"))
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 ALLOWED_IMAGE_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
+_chat_sessions_cache = TTLCache(ttl_seconds=CHAT_SESSIONS_CACHE_SECONDS, max_items=256)
 GENERIC_CHAT_TOKENS = {
     "oi",
     "ola",
@@ -121,6 +124,14 @@ def _get_user_email(user_id):
     return user_data["email"] if user_data else "guest"
 
 
+def _chat_sessions_cache_key(user_id):
+    return ("chat_sessions", str(user_id))
+
+
+def _invalidate_chat_sessions_cache(user_id):
+    _chat_sessions_cache.invalidate(_chat_sessions_cache_key(user_id))
+
+
 def _build_session_summaries(user_id, limit=50):
     with get_db() as (cursor, conn):
         cursor.execute(
@@ -130,56 +141,30 @@ def _build_session_summaries(user_id, limit=50):
                 grouped.created_at,
                 grouped.updated_at,
                 grouped.message_count,
-                (
-                    SELECT ch.content
-                    FROM chat_history ch
-                    WHERE ch.user_id = %s
-                      AND ch.session_id = grouped.session_id
-                      AND ch.message_type = 'human'
-                      AND CHAR_LENGTH(TRIM(ch.content)) > 5
-                    ORDER BY ch.timestamp ASC, ch.id ASC
-                    LIMIT 1
-                ) AS title_candidate,
-                (
-                    SELECT ch.content
-                    FROM chat_history ch
-                    WHERE ch.user_id = %s
-                      AND ch.session_id = grouped.session_id
-                      AND ch.message_type = 'human'
-                    ORDER BY ch.timestamp ASC, ch.id ASC
-                    LIMIT 1
-                ) AS first_human_message,
-                (
-                    SELECT ch.content
-                    FROM chat_history ch
-                    WHERE ch.user_id = %s
-                      AND ch.session_id = grouped.session_id
-                    ORDER BY ch.timestamp ASC, ch.id ASC
-                    LIMIT 1
-                ) AS first_message,
-                (
-                    SELECT ch.content
-                    FROM chat_history ch
-                    WHERE ch.user_id = %s
-                      AND ch.session_id = grouped.session_id
-                    ORDER BY ch.timestamp DESC, ch.id DESC
-                    LIMIT 1
-                ) AS last_message
+                first_human.content AS first_human_message,
+                first_message.content AS first_message,
+                last_message.content AS last_message
             FROM (
                 SELECT
                     session_id,
                     MIN(timestamp) AS created_at,
                     MAX(timestamp) AS updated_at,
-                    COUNT(*) AS message_count
+                    COUNT(*) AS message_count,
+                    MIN(id) AS first_id,
+                    MIN(CASE WHEN message_type = 'human' THEN id END) AS first_human_id,
+                    MAX(id) AS last_id
                 FROM chat_history
                 WHERE user_id = %s AND session_id IS NOT NULL AND session_id != ''
                 GROUP BY session_id
                 ORDER BY updated_at DESC
                 LIMIT %s
             ) grouped
+            LEFT JOIN chat_history first_human ON first_human.id = grouped.first_human_id
+            LEFT JOIN chat_history first_message ON first_message.id = grouped.first_id
+            LEFT JOIN chat_history last_message ON last_message.id = grouped.last_id
             ORDER BY grouped.updated_at DESC
             """,
-            (user_id, user_id, user_id, user_id, user_id, limit),
+            (user_id, limit),
         )
         rows = cursor.fetchall() or []
 
@@ -189,7 +174,6 @@ def _build_session_summaries(user_id, limit=50):
             (
                 candidate
                 for candidate in (
-                    row.get("title_candidate"),
                     row.get("first_human_message"),
                     row.get("first_message"),
                 )
@@ -243,6 +227,7 @@ def chat():
 
     agent = get_agent(session_id=session_id, user_id=user_id, email=email)
     response_text = agent.run_text(message)
+    _invalidate_chat_sessions_cache(user_id)
     return jsonify({"success": True, "session_id": session_id, "response": response_text}), 200
 
 
@@ -283,7 +268,13 @@ def chat_history():
 def chat_sessions():
     user_id = get_jwt_identity()
     try:
+        cache_key = _chat_sessions_cache_key(user_id)
+        cached_sessions = _chat_sessions_cache.get(cache_key)
+        if cached_sessions is not None:
+            return jsonify({"success": True, "sessions": cached_sessions}), 200
+
         sessions = _build_session_summaries(user_id)
+        _chat_sessions_cache.set(cache_key, sessions)
         return jsonify({"success": True, "sessions": sessions}), 200
     except Exception as e:
         logger.exception("Erro ao listar sessoes de chat")
@@ -308,6 +299,7 @@ def delete_chat_session(session_id):
             conn.commit()
 
         clear_session_agent(user_id, session_id)
+        _invalidate_chat_sessions_cache(user_id)
         if deleted <= 0:
             return jsonify({"error": "Conversa nao encontrada"}), 404
         return jsonify({"success": True, "deleted": deleted}), 200
@@ -369,6 +361,7 @@ def analyze_image():
             ("human", f"Imagem enviada: {file.filename}"),
             ("ai", analysis_result),
         ])
+        _invalidate_chat_sessions_cache(user_id)
 
         return jsonify({
             "success": True,

@@ -1,196 +1,254 @@
-# 🥗 NutriNow
+# NutriNow
 
-Plataforma digital de nutricao e performance que transforma orientacao tecnica em acoes simples no dia a dia.
+NutriNow e uma plataforma web para acompanhamento de nutricao, treinos e rotina saudavel com apoio da NutriAI.
 
-![Logo do projeto](Nutrinow_Frontend/src/assets/logo.png)
+![Logo do projeto](Nutrinow_Frontend/assets/logo.png)
 
-## ✨ O produto
+## Visao geral
 
-O NutriNow 2 foi desenhado para quem quer melhorar saude, composicao corporal e consistencia sem depender de planilhas confusas.
+O projeto combina uma SPA estatica no frontend com uma API Flask no backend. A aplicacao permite criar conta, manter perfil fisico, registrar dietas e treinos, acompanhar progresso no dashboard, conversar com a NutriAI e sincronizar itens de rotina com o Google Calendar.
 
-A experiencia une:
+## Funcionalidades
 
-- 🎯 acompanhamento de perfil e objetivo;
-- 📅 organizacao de dieta e treino no mesmo lugar;
-- 🤖 assistente NutriAI para tirar duvidas e manter motivacao.
+### Autenticacao e conta
 
-## 🧩 Problema que resolvemos
+- Cadastro com dados pessoais, objetivo inicial, altura, peso e historico de treino.
+- Login tradicional com e-mail e senha.
+- Login com Google OAuth, criando o usuario automaticamente quando necessario.
+- Logout com limpeza de cookies/tokens e cache de agentes da NutriAI.
+- Renovacao de sessao com refresh token em cookie seguro.
+- Endpoint `/me` para recuperar a conta autenticada.
+- Recuperacao e redefinicao de senha por e-mail, com token temporario salvo no MySQL.
+- Validacao de senha minima e bloqueio de senhas comuns.
+- Rate limit em fluxos sensiveis, como login, cadastro, redefinicao de senha, chat e feedback.
 
-Muita gente comeca uma rotina de saude, mas para no meio por 3 motivos:
+### Perfil e dashboard
 
-- 😕 falta de clareza sobre o que fazer;
-- 🔁 dificuldade para manter constancia;
-- 📚 excesso de informacao contraditoria.
+- Perfil editavel com nome, sobrenome, genero, data de nascimento, e-mail, meta, altura, peso e experiencia com treino.
+- Persistencia dos dados do perfil no MySQL.
+- Dashboard autenticado com peso, altura, IMC e objetivo atual.
+- Historico recente de peso/atividade baseado nos registros de dieta e treino.
+- Insights gerados a partir de conversas com a NutriAI e itens cadastrados na rotina.
+- Avatar local no frontend para personalizar a experiencia do usuario.
 
-O NutriNow reduz essa friccao com orientacao continua, historico e contexto pessoal.
+### Dietas, treinos e calendario
 
-## 👥 Para quem e
+- Cadastro de itens de dieta e treino com titulo, descricao, tipo e horario.
+- Edicao e exclusao de itens existentes.
+- Separacao entre abas de treino e dieta no frontend.
+- Agendamento por data e hora.
+- Duracao configuravel por item.
+- Recorrencia semanal com selecao de dias da semana e data final opcional.
+- Calendario mensal no frontend com expansao de eventos recorrentes.
+- Sincronizacao automatica com Google Calendar ao criar, editar ou excluir itens, quando a conta estiver conectada.
 
-- 🏋️ pessoas que querem emagrecer, ganhar massa ou melhorar habitos;
-- 🌱 iniciantes que precisam de direcionamento pratico;
-- 📲 usuarios que querem centralizar treino, dieta e suporte em uma unica interface.
+### Google Calendar
 
-## 🚀 Principais beneficios
+- Verificacao de status da conexao.
+- Fluxo OAuth dedicado para permissao de calendario.
+- Armazenamento de access token, refresh token, escopo, expiracao e calendario ativo no MySQL.
+- Renovacao automatica do token quando possivel.
+- Sincronizacao manual de todos os itens cadastrados.
+- Criacao, atualizacao e exclusao de eventos no calendario do Google.
+- Suporte a eventos recorrentes via RRULE semanal.
+- Desconexao com remocao dos tokens e mapeamentos locais.
 
-- 🧭 Direcao clara: objetivo, progresso e rotina visiveis em um so fluxo.
-- 💬 Apoio continuo: NutriAI disponivel para duvidas e reforco de habitos.
-- ⚡ Menos atrito: cadastro, login e uso rapido, sem curva de aprendizado longa.
-- 📈 Evolucao mensuravel: historico de interacoes e registros para acompanhar consistencia.
+### NutriAI e chat
 
-## 🛠️ Funcionalidades atuais
+- Chat autenticado com sessoes independentes.
+- Historico persistido por usuario e sessao.
+- Listagem de conversas recentes com titulo, preview, data e quantidade de mensagens.
+- Exclusao de sessoes de conversa.
+- Contexto automatico do perfil do usuario no prompt da NutriAI.
+- Contexto automatico da agenda de dieta/treino no prompt da NutriAI.
+- Cache em memoria para agentes por usuario/sessao, reduzindo recriacao durante a conversa.
+- Fallback entre modelos Groq configuraveis por variavel de ambiente.
+- Retry com backoff para erros transitorios de rede, cota ou indisponibilidade.
+- Renderizacao de Markdown basico no frontend, incluindo listas, tabelas e enfases.
+- Upload de imagem no chat. No modo Groq atual, o endpoint aceita imagens, mas o agente responde que a analise visual ainda nao esta habilitada.
 
-- 🔐 Cadastro e login (incluindo Google OAuth).
-- 📧 Recuperacao de senha por e-mail.
-- 👤 Perfil com meta, peso, altura e historico.
-- 🥗 CRUD de dieta e treino.
-- Google Calendar: conexao OAuth, recorrencia semanal e sincronizacao automatica dos itens de dieta/treino.
-- 🤖 Chat com NutriAI (texto) com memoria no MySQL.
-- 📸 Endpoint de analise de imagem disponivel (agente atual em modo texto).
+### Feedbacks
 
-## 🗺️ Jornada do usuario (resumo)
+- Pagina publica/autenticada de feedback.
+- Envio de nota de 1 a 5 e comentario.
+- Associacao opcional ao usuario logado.
+- Persistencia dos feedbacks no MySQL.
+- Notificacao por e-mail para o endereco configurado em `EMAIL_SENDER`.
 
-1. 📝 Cria conta e define objetivo.
-2. ⚙️ Ajusta perfil inicial (dados fisicos e meta).
-3. 📆 Registra dieta e treino da semana.
-4. 💡 Usa o chat para suporte e ajustes.
-5. 📊 Volta ao dashboard para acompanhar constancia.
-
-## 🌟 Diferenciais do NutriNow
-
-- 🎯 Produto orientado a resultado, nao so a registro.
-- 🧠 IA contextual (considera usuario, sessao e historico).
-- 🏗️ Arquitetura pronta para evoluir de MVP para ambiente produtivo.
-
-## 🧱 Stack (para contexto)
+## Stack
 
 ### Frontend
 
-- React 19 com TypeScript.
-- Vite 7 para desenvolvimento, build e preview.
-- TanStack Router/TanStack Start para roteamento e estrutura da aplicação.
-- TanStack Query para controle de estado assíncrono e chamadas à API.
-- Tailwind CSS 4 para estilos utilitários.
-- Radix UI como base de componentes acessíveis.
-- Lucide React para ícones.
-- React Hook Form + Zod para formulários e validação.
-- Date-fns para manipulação de datas no calendário.
-- Recharts para visualizações e gráficos.
-- Sonner para notificações.
+- HTML, CSS e JavaScript puro.
+- SPA com roteamento client-side em `app.js`.
+- Scripts Node.js para servidor local, build estatico e checagem de sintaxe.
+- Assets em `Nutrinow_Frontend/assets/`.
+- Interface responsiva com paginas para landing, autenticacao, dashboard, planos, calendario, chat, perfil e feedbacks.
+- Estado de sessao salvo em `localStorage`, com compatibilidade para migrar dados antigos de `sessionStorage`.
+- Cache local para usuario autenticado, sessoes de chat e sessao atual.
+- Comunicacao com a API via `fetch`, incluindo envio automatico de JWT, refresh de sessao e tratamento centralizado de erros.
+- Upload de arquivos com `FormData` para o endpoint de analise de imagem.
+- Build proprio em `build-static.mjs`, com minificacao simples de HTML/CSS e copia de assets para `dist/`.
+- Servidor local proprio em `serve-static.mjs`, com fallback de SPA e headers de cache por tipo de arquivo.
 
 ### Backend
 
-- Python com Flask como API HTTP.
-- Flask-Cors para liberar comunicação entre frontend e backend em ambiente local.
-- MySQL Connector para acesso ao banco de dados.
-- Python-dotenv para leitura das variáveis do `.env`.
-- Requests + OAuthlib para integrações externas via HTTP/OAuth.
-- Werkzeug para recursos auxiliares de segurança e utilidades web.
-- Serviços organizados em rotas e módulos internos (`auth`, `profile`, `fitness`, `calendar`, `chatbot`, `feedbacks`).
+- Python + Flask.
+- Flask-Cors.
+- Flask-JWT-Extended.
+- MySQL Connector com pool de conexoes.
+- Werkzeug para hash de senha.
+- Requests + OAuthlib para Google OAuth e Google Calendar.
+- Groq em formato compativel com OpenAI Chat Completions para a NutriAI.
+- Gunicorn para deploy.
+- Estrutura em factory com `create_app()` e blueprints separados por dominio.
+- Blueprints principais: `auth`, `profile`, `fitness`, `calendar`, `chatbot` e `feedbacks`.
+- CORS configuravel por ambiente, com origens locais e de producao.
+- Cookies de refresh token com suporte a CSRF.
+- Headers de seguranca, incluindo `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`, CSP e HSTS em producao.
+- Limite de upload configuravel por `MAX_UPLOAD_MB`.
+- Cache TTL em memoria para sessoes de chat, itens de rotina e dados de conta.
+- Servimento opcional do frontend estatico gerado em `Nutrinow_Frontend/dist/`.
 
 ### Banco de dados
 
 - MySQL 8+.
-- Schema principal documentado em `NutriNow_BackEnd/SQL.txt`.
-- Armazena usuários, perfil, dieta/treino, histórico do chat, feedbacks e tokens/eventos vinculados ao Google Calendar.
+- Schema principal em `NutriNow_BackEnd/app/services/db_schema.py`.
+- Script de inicializacao/atualizacao em `NutriNow_BackEnd/init_db.py`.
+- `NutriNow_BackEnd/SQL.txt` fica como referencia historica/manual.
+- Tabelas principais: `usuarios`, `perfil`, `redefinicao_senha`, `dieta_treino`, `chat_history`, `uploads`, `feedbacks`, `google_calendar_tokens` e `google_calendar_events`.
+- Relacionamentos com chaves estrangeiras e exclusao em cascata onde faz sentido, como perfil, rotina e tokens vinculados ao usuario.
+- Indices para consultas frequentes por usuario, sessao, e-mail, data e tipo de item.
+- Pool de conexoes configuravel por `MYSQL_POOL_SIZE`, com opcao de desativar via `MYSQL_DISABLE_POOL`.
+- Suporte opcional a SSL no MySQL por `MYSQL_SSL_MODE` e `MYSQL_SSL_CA`.
 
-### Autenticação e integrações
+### Integracoes e servicos
 
-- Login tradicional com e-mail/senha.
-- Google OAuth 2.0 para autenticação.
-- Google Calendar API para criar, atualizar e excluir eventos automaticamente a partir dos itens de dieta/treino.
-- Recuperação de senha por e-mail via serviço SMTP configurado no backend.
-- Integração com Groq em formato compatível com OpenAI API para o chat NutriAI.
+- Google OAuth para login social.
+- Google Calendar API para criar, atualizar e excluir eventos de rotina.
+- SMTP para recuperacao de senha e notificacao de feedbacks.
+- Groq API para respostas da NutriAI.
+- `python-dotenv` para carregar variaveis de ambiente em desenvolvimento.
 
-### IA
+### Seguranca e confiabilidade
 
-- NutriAI roda no backend e usa histórico/contexto do usuário salvo no MySQL.
-- Dependências de LangChain estão presentes para evolução do agente e orquestração de fluxos.
-- Há suporte configurável por variáveis de ambiente para modelo principal, fallback, timeout, retries e temperatura.
+- Hash de senhas com Werkzeug.
+- Validacao basica de e-mail e senha.
+- Tokens JWT em access token e refresh token.
+- Serializacao assinada com `itsdangerous` para estados/codigos de OAuth e tokens de redefinicao.
+- Rate limit em memoria por IP, escopo e usuario/e-mail quando aplicavel.
+- Validacao de extensao, MIME type e assinatura dos arquivos de imagem enviados.
+- Bloqueio de CORS wildcard (`*`) para evitar configuracao insegura.
+- Segredos obrigatorios e com tamanho minimo em producao.
 
-### Tooling e qualidade
-
-- TypeScript para tipagem no frontend.
-- ESLint e Prettier para padronização do código frontend.
-- Scripts npm principais: `dev`, `build`, `preview`, `lint` e `format`.
-- Build do frontend com Vite.
-- Backend executado diretamente com `python App.py`.
-
----
-
-## 👨‍💻 Guia rapido para desenvolvedores
-
-### ✅ Requisitos
-
-- Node.js 20+
-- npm 10+
-- Python 3.10+
-- MySQL 8+
-
-### 🗂️ Estrutura
+## Estrutura
 
 ```text
 NutriNow-2/
-|- Nutrinow_Frontend/
 |- NutriNow_BackEnd/
+|  |- App.py
+|  |- init_db.py
+|  |- requirements.txt
+|  |- Procfile
+|  `- app/
+|     |- routes/
+|     `- services/
+|- Nutrinow_Frontend/
+|  |- index.html
+|  |- app.js
+|  |- styles.css
+|  |- build-static.mjs
+|  |- serve-static.mjs
+|  `- assets/
 `- README.md
 ```
 
-### ⚙️ Backend
+## Requisitos
 
-```bash
-cd NutriNow_BackEnd
-pip install -r requirements.txt
-python App.py
+- Node.js 18+
+- npm
+- Python 3.10+
+- MySQL 8+
+
+## Configuracao do banco
+
+Crie o banco antes de iniciar o backend:
+
+```sql
+CREATE DATABASE nutrinow2 CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-Backend padrao: `http://127.0.0.1:8000`  
-Healthcheck: `GET /health`
+Depois de configurar o `.env`, rode o inicializador de schema:
 
-`.env` esperado em `NutriNow_BackEnd/`:
+```powershell
+cd NutriNow_BackEnd
+python init_db.py
+```
+
+O script cria ou atualiza as tabelas principais: usuarios, perfil, redefinicao de senha, dieta/treino, historico de chat, uploads, feedbacks e tabelas do Google Calendar.
+
+## Variaveis de ambiente
+
+Crie `NutriNow_BackEnd/.env`:
 
 ```env
+APP_ENV=development
+HOST=127.0.0.1
+PORT=8000
+FLASK_DEBUG=true
+FLASK_SECRET_KEY=troque_esta_chave_por_uma_chave_grande
+JWT_SECRET_KEY=troque_esta_chave_por_uma_chave_grande
+JWT_ACCESS_TOKEN_MINUTES=9999
+JWT_REFRESH_TOKEN_DAYS=30
+JWT_COOKIE_SECURE=false
+JWT_COOKIE_SAMESITE=Lax
+
+FRONTEND_URL=http://localhost:5173
+CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+
 MYSQL_HOST=localhost
 MYSQL_PORT=3306
 MYSQL_USER=root
 MYSQL_PASSWORD=sua_senha
 MYSQL_DATABASE=nutrinow2
-HOST=127.0.0.1
-PORT=8000
-FLASK_DEBUG=true
-FLASK_SECRET_KEY=troque_esta_chave
-JWT_SECRET_KEY=troque_esta_chave
-FRONTEND_URL=http://localhost:5173
-CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+MYSQL_POOL_SIZE=2
+
 GROQ_API_KEY=sua_chave_groq
 GROQ_BASE_URL=https://api.groq.com/openai/v1
-GROQ_PRIMARY_MODEL=groq/compound-mini
-GROQ_FALLBACK_MODELS=groq/compound
+GROQ_PRIMARY_MODEL=seu_modelo_principal
+GROQ_FALLBACK_MODELS=seu_modelo_fallback
 GROQ_TIMEOUT_SECONDS=60
 GROQ_MAX_RETRIES=5
 GROQ_TEMPERATURE=0.7
-CLIENT_ID=seu_google_client_id
-SECRET_KEY_CLIENT=seu_google_client_secret
+
+GOOGLE_CLIENT_ID=seu_google_client_id
+GOOGLE_CLIENT_SECRET=seu_google_client_secret
+GOOGLE_LOGIN_REDIRECT_URI=http://127.0.0.1:8000/auth/callback
 GOOGLE_CALENDAR_REDIRECT_URI=http://127.0.0.1:8000/calendar/google/callback
 GOOGLE_CALENDAR_TIMEZONE=America/Sao_Paulo
 GOOGLE_CALENDAR_EVENT_DURATION_MINUTES=60
+
 EMAIL_SENDER=seu_email@gmail.com
 EMAIL_PASSWORD=sua_senha_de_app
+
+MAX_UPLOAD_MB=5
+UPLOAD_FOLDER=uploads
+CHAT_MESSAGE_MAX_CHARS=8000
 ```
 
-No Google Cloud Console, ative a Google Calendar API e adicione a URI acima em
-**Authorized redirect URIs** do cliente OAuth. A integracao usa o escopo
-`https://www.googleapis.com/auth/calendar.events`.
+Em producao, use `APP_ENV=production`, configure `FRONTEND_URL_PROD`/`CORS_ORIGINS_PROD`, ative cookies seguros e use segredos com pelo menos 32 caracteres.
 
-### 🎨 Frontend
+## Como rodar localmente
 
-```bash
-cd Nutrinow_Frontend
-npm install
-npm run dev
+### Backend
+
+```powershell
+cd NutriNow_BackEnd
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python init_db.py
+python App.py
 ```
 
-Crie `.env` com:
-
-```env
-VITE_API_URL=http://127.0.0.1:8000
-```
+API local: `http://127.0.0.1:8000`

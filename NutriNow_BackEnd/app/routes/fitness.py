@@ -4,18 +4,30 @@ from datetime import datetime, timedelta
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
-from app.database import get_db, get_db_connection
+from app.database import get_db
 from app.routes.calendar import delete_google_calendar_item, sync_google_calendar_item
+from app.services.runtime_cache import TTLCache
 from app.services.schema_cache import ensure_dieta_treino_schedule_columns
 
 logger = logging.getLogger(__name__)
 fitness_bp = Blueprint("fitness", __name__)
 
 WEEKDAY_ORDER = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
+ITEMS_CACHE_SECONDS = 20
+
+_items_cache = TTLCache(ttl_seconds=ITEMS_CACHE_SECONDS, max_items=512)
 
 
 def _ensure_dieta_treino_schedule_columns(cursor):
     ensure_dieta_treino_schedule_columns(cursor)
+
+
+def _items_cache_key(user_id, tipo):
+    return (str(user_id), tipo)
+
+
+def _invalidate_items_cache(user_id):
+    _items_cache.invalidate_prefix((str(user_id),))
 
 
 def _parse_recurrence_days(value):
@@ -99,6 +111,10 @@ def get_items():
     user_id = get_jwt_identity()
     aba = request.args.get("tipo", "treinos")
     tipo = "treino" if "treino" in str(aba).lower() else "dieta"
+    cache_key = _items_cache_key(user_id, tipo)
+    cached_items = _items_cache.get(cache_key)
+    if cached_items is not None:
+        return jsonify({"success": True, "items": cached_items}), 200
 
     try:
         with get_db() as (cursor, conn):
@@ -124,7 +140,7 @@ def get_items():
                 (user_id, tipo),
             )
             items = cursor.fetchall()
-            conn.commit()
+            _items_cache.set(cache_key, items)
             return jsonify({"success": True, "items": items}), 200
     except Exception as e:
         logger.error(f"Erro ao buscar itens: {e}")
@@ -218,6 +234,7 @@ def add_item():
             item_id = cursor.lastrowid
             conn.commit()
 
+        _invalidate_items_cache(user_id)
         calendar_sync = sync_google_calendar_item(user_id, item_id)
         return (
             jsonify(
@@ -323,6 +340,7 @@ def update_item(item_id):
             updated = cursor.rowcount
             conn.commit()
 
+        _invalidate_items_cache(user_id)
         if updated == 0:
             return jsonify({"error": "Item nao encontrado"}), 404
 
@@ -352,6 +370,7 @@ def delete_item(item_id):
             deleted = cursor.rowcount
             conn.commit()
 
+        _invalidate_items_cache(user_id)
         if deleted == 0:
             return jsonify({"error": "Item nao encontrado"}), 404
 

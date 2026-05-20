@@ -2,7 +2,7 @@ import os
 import logging
 from datetime import timedelta
 from dotenv import load_dotenv
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from werkzeug.exceptions import RequestEntityTooLarge
@@ -43,8 +43,8 @@ def create_app():
         os.environ.pop("OAUTHLIB_INSECURE_TRANSPORT", None)
 
     jwt_secret = _secret_or_dev_fallback("JWT_SECRET_KEY", app.secret_key)
-    jwt_minutes = int(os.getenv("JWT_ACCESS_TOKEN_MINUTES", "60"))
-    jwt_refresh_days = int(os.getenv("JWT_REFRESH_TOKEN_DAYS", "30"))
+    jwt_minutes = int(os.getenv("JWT_ACCESS_TOKEN_MINUTES", "9999"))
+    jwt_refresh_days = int(os.getenv("JWT_REFRESH_TOKEN_DAYS", "9999"))
     jwt_cookie_samesite = os.getenv("JWT_COOKIE_SAMESITE") or ("Lax" if is_development() else "None")
     max_upload_mb = int(os.getenv("MAX_UPLOAD_MB", "5"))
     upload_folder = os.getenv("UPLOAD_FOLDER", os.path.join(os.getcwd(), "uploads"))
@@ -88,6 +88,28 @@ def create_app():
     def health():
         return jsonify({"status": "ok"})
 
+    frontend_dist = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "..", "Nutrinow_Frontend", "dist")
+    )
+
+    @app.route("/", defaults={"path": ""}, methods=["GET"])
+    @app.route("/<path:path>", methods=["GET"])
+    def serve_frontend(path):
+        index_path = os.path.join(frontend_dist, "index.html")
+        requested_path = os.path.abspath(os.path.join(frontend_dist, path))
+
+        if path and requested_path.startswith(frontend_dist) and os.path.isfile(requested_path):
+            cache_seconds = 31536000 if path.startswith("assets/") else 3600
+            response = send_from_directory(frontend_dist, path, max_age=cache_seconds)
+            if path.startswith("assets/"):
+                response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            return response
+
+        if os.path.isfile(index_path):
+            return send_from_directory(frontend_dist, "index.html", max_age=0)
+
+        return jsonify({"error": "Frontend estatico nao encontrado. Rode npm.cmd run build no Nutrinow_Frontend."}), 404
+
     @app.errorhandler(RequestEntityTooLarge)
     def request_entity_too_large(_error):
         return jsonify({"error": "Arquivo excede o limite permitido"}), 413
@@ -97,7 +119,19 @@ def create_app():
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("Referrer-Policy", "no-referrer")
         response.headers.setdefault("X-Frame-Options", "DENY")
-        response.headers.setdefault("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+        if request.endpoint == "serve_frontend":
+            response.headers.setdefault(
+                "Content-Security-Policy",
+                "default-src 'self'; "
+                "script-src 'self'; "
+                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+                "font-src 'self' https://fonts.gstatic.com; "
+                "img-src 'self' data:; "
+                "connect-src 'self' http://127.0.0.1:8000 http://localhost:8000; "
+                "frame-ancestors 'none'",
+            )
+        else:
+            response.headers.setdefault("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
         if not is_development():
             response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
         return response

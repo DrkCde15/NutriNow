@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NutriNow - Nutrição e treinos com IA</title>
+    <meta
+      name="description"
+      content="NutriNow é seu assistente de nutrição e treinos com IA. Crie planos personalizados, analise refeições por foto e converse com a NutriAI."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap"
+    />
+    <link rel="preload" as="image" href="./assets/hero-nutrition.jpg" />
+    <link rel="stylesheet" href="./styles.css?v=20260520-persistent-auth" />
+    <style>
+      .hero-media {
+        width: min(100%, 30rem) !important;
+        justify-self: center !important;
+      }
+
+      .hero-image {
+        aspect-ratio: 1 / 1 !important;
+        height: auto !important;
+        max-height: 30rem !important;
+      }
+
+      .hero-image img {
+        display: block !important;
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script src="./app.js?v=20260520-persistent-auth" defer></script>
+  </body>
+</html>

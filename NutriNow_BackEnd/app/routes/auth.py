@@ -22,6 +22,7 @@ from flask_jwt_extended import (
     verify_jwt_in_request,
 )
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
+from mysql.connector import IntegrityError, errorcode
 from oauthlib.oauth2 import WebApplicationClient
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -261,12 +262,8 @@ def cadastro():
         return rate_limit_response(retry_after)
 
     try:
+        senha_hash = generate_password_hash(senha)
         with get_db() as (cursor, conn):
-            cursor.execute("SELECT id FROM usuarios WHERE email=%s", (email,))
-            if cursor.fetchone():
-                return jsonify({"error": "Email ja cadastrado"}), 409
-
-            senha_hash = generate_password_hash(senha)
             cursor.execute(
                 """
                 INSERT INTO usuarios (nome, sobrenome, data_nascimento, genero, email, senha)
@@ -285,7 +282,20 @@ def cadastro():
             )
 
             conn.commit()
-            return jsonify({"message": "Conta criada com sucesso!"}), 201
+
+        user = {
+            "id": user_id,
+            "nome": nome,
+            "email": email,
+            "altura": altura,
+            "peso": peso,
+        }
+        return _auth_response(user, "Conta criada com sucesso!"), 201
+    except IntegrityError as exc:
+        if exc.errno == errorcode.ER_DUP_ENTRY:
+            return jsonify({"error": "Email ja cadastrado"}), 409
+        logger.error(f"Erro de integridade ao criar conta: {exc}")
+        return jsonify({"error": "Erro interno ao criar conta"}), 500
     except Exception as exc:
         logger.error(f"Erro ao criar conta: {exc}")
         return jsonify({"error": "Erro interno ao criar conta"}), 500
@@ -319,10 +329,11 @@ def login():
                 (email,),
             )
             user = cursor.fetchone()
-            if not user or not check_password_hash(user["senha"], senha):
-                return jsonify({"error": "Email ou senha invalidos"}), 401
 
-            return _auth_response(user), 200
+        if not user or not check_password_hash(user["senha"], senha):
+            return jsonify({"error": "Email ou senha invalidos"}), 401
+
+        return _auth_response(user), 200
     except Exception as exc:
         logger.error(f"Erro no login: {exc}")
         return jsonify({"error": "Erro interno do servidor"}), 500

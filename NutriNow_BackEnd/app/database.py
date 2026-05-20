@@ -10,6 +10,20 @@ _pool_config_key = None
 _pool_lock = Lock()
 
 
+def _env_int(name, default):
+    try:
+        return int(os.getenv(name, default))
+    except (TypeError, ValueError):
+        return int(default)
+
+
+def _env_bool(name, default=False):
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _db_config():
     config = {
         "host": os.getenv("MYSQL_HOST"),
@@ -17,6 +31,7 @@ def _db_config():
         "user": os.getenv("MYSQL_USER"),
         "password": os.getenv("MYSQL_PASSWORD"),
         "database": os.getenv("MYSQL_DATABASE"),
+        "connection_timeout": _env_int("MYSQL_CONNECTION_TIMEOUT", 10),
     }
 
     ssl_mode = os.getenv("MYSQL_SSL_MODE", "").strip().lower()
@@ -43,8 +58,8 @@ def _get_pool():
         if _pool is None or _pool_config_key != config_key:
             _pool = pooling.MySQLConnectionPool(
                 pool_name=os.getenv("MYSQL_POOL_NAME", "nutrinow_pool"),
-                pool_size=int(os.getenv("MYSQL_POOL_SIZE", "5")),
-                pool_reset_session=True,
+                pool_size=_env_int("MYSQL_POOL_SIZE", 2),
+                pool_reset_session=_env_bool("MYSQL_POOL_RESET_SESSION", False),
                 **config,
             )
             _pool_config_key = config_key
