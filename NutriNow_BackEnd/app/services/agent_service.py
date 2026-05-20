@@ -11,7 +11,6 @@ AGENT_CACHE_MAX_PER_USER = 8
 
 agent_cache = OrderedDict()
 
-
 def _purge_expired_agents():
     now = time.monotonic()
     expired_keys = [

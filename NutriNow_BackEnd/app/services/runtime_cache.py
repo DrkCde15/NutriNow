@@ -2,7 +2,6 @@ import time
 from copy import deepcopy
 from threading import Lock
 
-
 class TTLCache:
     def __init__(self, ttl_seconds=15, max_items=256):
         self.ttl_seconds = ttl_seconds

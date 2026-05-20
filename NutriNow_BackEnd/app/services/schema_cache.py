@@ -14,10 +14,8 @@ DIETA_TREINO_SCHEDULE_COLUMNS = {
 _table_columns_cache = {}
 _cache_lock = Lock()
 
-
 def _normalize_column_name(row):
     return row.get("column_name") or row.get("COLUMN_NAME")
-
 
 def get_table_columns(cursor, table_name):
     if not TABLE_NAME_RE.match(table_name or ""):
@@ -49,11 +47,9 @@ def get_table_columns(cursor, table_name):
 
     return columns
 
-
 def invalidate_table_columns(table_name):
     with _cache_lock:
         _table_columns_cache.pop(table_name, None)
-
 
 def resolve_dieta_user_column(cursor):
     columns = get_table_columns(cursor, "dieta_treino")
@@ -62,7 +58,6 @@ def resolve_dieta_user_column(cursor):
     if "usuario_id" in columns:
         return "usuario_id"
     return "user_id"
-
 
 def ensure_dieta_treino_schedule_columns(cursor):
     columns = get_table_columns(cursor, "dieta_treino")

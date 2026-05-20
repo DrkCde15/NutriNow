@@ -9,7 +9,6 @@ from hashlib import sha256
 from html import escape
 from threading import Lock
 from urllib.parse import urlencode
-
 import requests
 from flask import Blueprint, current_app, jsonify, redirect, request, url_for
 from flask_jwt_extended import (
@@ -25,7 +24,6 @@ from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from mysql.connector import IntegrityError, errorcode
 from oauthlib.oauth2 import WebApplicationClient
 from werkzeug.security import check_password_hash, generate_password_hash
-
 from app.database import get_db
 from app.security import (
     check_rate_limit,
@@ -54,14 +52,12 @@ _google_hosts_lock = Lock()
 _used_oauth_exchange_codes = {}
 _oauth_code_lock = Lock()
 
-
 @dataclass
 class GoogleHosts:
     authorization_endpoint: str
     token_endpoint: str
     userinfo_endpoint: str
     certs: str
-
 
 def get_google_client_config():
     client_id = os.getenv("GOOGLE_CLIENT_ID") or os.getenv("CLIENT_ID")
@@ -72,11 +68,9 @@ def get_google_client_config():
 
     return client_id, client_secret
 
-
 def create_google_oauth_client():
     client_id, client_secret = get_google_client_config()
     return WebApplicationClient(client_id=client_id), client_id, client_secret
-
 
 def get_google_oauth_hosts():
     now = time.time()
@@ -102,7 +96,6 @@ def get_google_oauth_hosts():
 
     return hosts
 
-
 def _get_state_serializer():
     secret = (
         current_app.secret_key
@@ -114,13 +107,11 @@ def _get_state_serializer():
         raise RuntimeError("Chave de assinatura do app nao configurada")
     return URLSafeTimedSerializer(secret)
 
-
 def _google_login_redirect_uri():
     configured = os.getenv("GOOGLE_LOGIN_REDIRECT_URI") or os.getenv("GOOGLE_REDIRECT_URI")
     if configured:
         return configured.strip()
     return url_for("auth.google_callback", _external=True)
-
 
 def _frontend_redirect(origin, path="/login", **params):
     target_origin = select_frontend_origin(origin)
@@ -128,14 +119,12 @@ def _frontend_redirect(origin, path="/login", **params):
     normalized_path = path if path.startswith("/") else f"/{path}"
     return f"{target_origin}{normalized_path}{'?' + query if query else ''}"
 
-
 def _issue_oauth_exchange_code(user_id):
     payload = {
         "user_id": str(user_id),
         "jti": secrets.token_urlsafe(24),
     }
     return _get_state_serializer().dumps(payload, salt=GOOGLE_LOGIN_CODE_SALT)
-
 
 def _consume_oauth_exchange_code(code):
     payload = _get_state_serializer().loads(
@@ -161,16 +150,13 @@ def _consume_oauth_exchange_code(code):
 
     return str(user_id)
 
-
 def _hash_reset_token(token):
     return sha256(str(token or "").encode("utf-8")).hexdigest()
-
 
 def _optional_float(value):
     if value is None:
         return None
     return float(value)
-
 
 def _account_payload(user):
     return {
@@ -181,16 +167,13 @@ def _account_payload(user):
         "peso": _optional_float(user.get("peso")),
     }
 
-
 def _refresh_cookie_max_age():
     return int(os.getenv("JWT_REFRESH_TOKEN_DAYS", "30")) * 24 * 60 * 60
-
 
 def _set_refresh_cookie(response, user_id):
     refresh_token = create_refresh_token(identity=str(user_id))
     set_refresh_cookies(response, refresh_token, max_age=_refresh_cookie_max_age())
     return response
-
 
 def _account_by_id(user_id):
     cached_user = get_cached_account(user_id)
@@ -217,7 +200,6 @@ def _account_by_id(user_id):
     set_cached_account(user_id, payload)
     return payload
 
-
 def _auth_response(user, message="Login realizado com sucesso!"):
     account = _account_payload(user)
     access_token = create_access_token(identity=str(account["id"]))
@@ -231,7 +213,6 @@ def _auth_response(user, message="Login realizado com sucesso!"):
     )
     _set_refresh_cookie(response, account["id"])
     return response
-
 
 @auth_bp.route("/cadastro", methods=["POST", "OPTIONS"])
 def cadastro():
@@ -300,7 +281,6 @@ def cadastro():
         logger.error(f"Erro ao criar conta: {exc}")
         return jsonify({"error": "Erro interno ao criar conta"}), 500
 
-
 @auth_bp.route("/login", methods=["POST", "OPTIONS"])
 def login():
     if request.method == "OPTIONS":
@@ -338,7 +318,6 @@ def login():
         logger.error(f"Erro no login: {exc}")
         return jsonify({"error": "Erro interno do servidor"}), 500
 
-
 @auth_bp.route("/auth/login", methods=["GET"])
 def google_login():
     try:
@@ -363,8 +342,7 @@ def google_login():
     except Exception as exc:
         logger.error(f"Erro ao iniciar OAuth do Google: {exc}")
         return jsonify({"error": "Falha ao iniciar login com Google"}), 500
-
-
+    
 @auth_bp.route("/auth/callback")
 def google_callback():
     fallback_origin = select_frontend_origin()
@@ -464,7 +442,6 @@ def google_callback():
         logger.error(f"Erro no callback do Google: {exc}")
         return redirect(_frontend_redirect(target_origin, "/login", error="server_error"))
 
-
 @auth_bp.route("/auth/exchange-code", methods=["POST"])
 def exchange_google_auth_code():
     data = request.get_json(silent=True) or {}
@@ -503,7 +480,6 @@ def exchange_google_auth_code():
         logger.error(f"Erro ao trocar codigo OAuth: {exc}")
         return jsonify({"error": "Erro interno do servidor"}), 500
 
-
 @auth_bp.route("/logout", methods=["POST"])
 def logout():
     try:
@@ -517,7 +493,6 @@ def logout():
     response = jsonify({"message": "Logout realizado"})
     unset_jwt_cookies(response)
     return response, 200
-
 
 @auth_bp.route("/refresh", methods=["POST"])
 @jwt_required(refresh=True, locations=["cookies"])
@@ -545,7 +520,6 @@ def refresh_session():
     _set_refresh_cookie(response, account["id"])
     return response, 200
 
-
 @auth_bp.route("/me", methods=["GET"])
 @jwt_required()
 def get_me():
@@ -555,7 +529,6 @@ def get_me():
         return jsonify({"error": "Usuario nao encontrado"}), 404
 
     return jsonify(account), 200
-
 
 @auth_bp.route("/esqueci-senha", methods=["POST"])
 def esqueci_senha():
@@ -604,7 +577,6 @@ def esqueci_senha():
         logger.error(f"Erro ao solicitar redefinicao de senha: {exc}")
         return jsonify({"error": "Erro interno ao solicitar redefinicao de senha"}), 500
 
-
 @auth_bp.route("/redefinir-senha", methods=["POST"])
 def redefinir_senha():
     data = request.get_json(silent=True) or {}
@@ -620,7 +592,6 @@ def redefinir_senha():
     allowed, retry_after = check_rate_limit("password_reset_confirm", 10, 3600)
     if not allowed:
         return rate_limit_response(retry_after)
-
     try:
         with get_db() as (cursor, conn):
             cursor.execute(

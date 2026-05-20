@@ -4,10 +4,8 @@ import re
 import unicodedata
 import uuid
 from pathlib import Path
-
 from flask import Blueprint, current_app, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
-
 from app.database import get_db
 from app.security import check_rate_limit, rate_limit_response
 from app.services.agent_service import clear_session_agent, get_agent
@@ -42,7 +40,6 @@ GENERIC_CHAT_TOKENS = {
     "bem",
 }
 
-
 def _normalize_session_id(value, create_if_missing=False):
     session_id = (value or "").strip()
     if not session_id and create_if_missing:
@@ -51,18 +48,15 @@ def _normalize_session_id(value, create_if_missing=False):
         return session_id
     return None
 
-
 def _normalize_chat_text(value):
     text = unicodedata.normalize("NFD", str(value or ""))
     text = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
     text = re.sub(r"[^\w\s-]", " ", text.lower())
     return re.sub(r"\s+", " ", text).strip()
 
-
 def _is_generic_chat_message(message):
     tokens = [token for token in _normalize_chat_text(message).split(" ") if token]
     return bool(tokens) and len(tokens) <= 5 and all(token in GENERIC_CHAT_TOKENS for token in tokens)
-
 
 def _truncate_text(value, limit=80):
     text = re.sub(r"\s+", " ", str(value or "")).strip()
@@ -70,17 +64,14 @@ def _truncate_text(value, limit=80):
         return text
     return f"{text[: limit - 3].rstrip()}..."
 
-
 def _serialize_timestamp(value):
     return value.isoformat() if hasattr(value, "isoformat") else value
-
 
 def _upload_folder():
     folder = Path(current_app.config.get("UPLOAD_FOLDER") or os.getenv("UPLOAD_FOLDER") or "uploads")
     folder = folder.resolve()
     folder.mkdir(parents=True, exist_ok=True)
     return folder
-
 
 def _detect_image_extension(header):
     if header.startswith(b"\xff\xd8\xff"):
@@ -90,7 +81,6 @@ def _detect_image_extension(header):
     if header.startswith(b"RIFF") and header[8:12] == b"WEBP":
         return ".webp"
     return None
-
 
 def _validated_image_extension(file):
     original_ext = os.path.splitext(file.filename or "")[1].lower()
@@ -112,7 +102,6 @@ def _validated_image_extension(file):
         return detected_ext
     return None
 
-
 def _get_user_email(user_id):
     account = get_cached_account(user_id)
     if account and account.get("email"):
@@ -123,14 +112,11 @@ def _get_user_email(user_id):
         user_data = cursor.fetchone()
     return user_data["email"] if user_data else "guest"
 
-
 def _chat_sessions_cache_key(user_id):
     return ("chat_sessions", str(user_id))
 
-
 def _invalidate_chat_sessions_cache(user_id):
     _chat_sessions_cache.invalidate(_chat_sessions_cache_key(user_id))
-
 
 def _build_session_summaries(user_id, limit=50):
     with get_db() as (cursor, conn):
@@ -167,7 +153,6 @@ def _build_session_summaries(user_id, limit=50):
             (user_id, limit),
         )
         rows = cursor.fetchall() or []
-
     sessions = []
     for row in rows:
         title_source = next(
@@ -196,9 +181,7 @@ def _build_session_summaries(user_id, limit=50):
                 "message_count": row["message_count"],
             }
         )
-
     return sessions
-
 
 @chatbot_bp.route("/chat", methods=["POST"])
 @jwt_required()
@@ -229,7 +212,6 @@ def chat():
     response_text = agent.run_text(message)
     _invalidate_chat_sessions_cache(user_id)
     return jsonify({"success": True, "session_id": session_id, "response": response_text}), 200
-
 
 @chatbot_bp.route("/chat_history", methods=["GET"])
 @jwt_required()
@@ -262,7 +244,6 @@ def chat_history():
     ]
     return jsonify({"success": True, "history": history})
 
-
 @chatbot_bp.route("/chat_sessions", methods=["GET"])
 @jwt_required()
 def chat_sessions():
@@ -279,7 +260,6 @@ def chat_sessions():
     except Exception as e:
         logger.exception("Erro ao listar sessoes de chat")
         return jsonify({"success": False, "error": "Falha ao listar sessoes de chat"}), 500
-
 
 @chatbot_bp.route("/chat_sessions/<session_id>", methods=["DELETE"])
 @jwt_required()
@@ -306,7 +286,6 @@ def delete_chat_session(session_id):
     except Exception as e:
         logger.exception("Erro ao excluir sessao de chat")
         return jsonify({"success": False, "error": "Falha ao excluir sessao de chat"}), 500
-
 
 @chatbot_bp.route("/analyze_image", methods=["POST", "OPTIONS"])
 @jwt_required()

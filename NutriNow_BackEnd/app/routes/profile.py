@@ -1,9 +1,7 @@
 import logging
 from datetime import datetime, timedelta
-
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
-
 from app.database import get_db
 from app.services.account_cache import invalidate_cached_account
 from app.services.schema_cache import resolve_dieta_user_column
@@ -11,13 +9,11 @@ from app.services.schema_cache import resolve_dieta_user_column
 logger = logging.getLogger(__name__)
 profile_bp = Blueprint("profile", __name__)
 
-
 def _truncate_text(text, limit=140):
     clean = " ".join((text or "").strip().split())
     if len(clean) <= limit:
         return clean
     return f"{clean[: limit - 3].rstrip()}..."
-
 
 def _to_datetime(value):
     if isinstance(value, datetime):
@@ -29,7 +25,6 @@ def _to_datetime(value):
             except ValueError:
                 continue
     return datetime.now()
-
 
 def _infer_insight_status(text, source_type=None):
     lowered = (text or "").lower()
@@ -65,14 +60,12 @@ def _infer_insight_status(text, source_type=None):
         return "positive"
     return "neutral"
 
-
 def _resolve_dieta_user_column(cursor):
     try:
         return resolve_dieta_user_column(cursor)
     except Exception as exc:
         logger.warning(f"Nao foi possivel detectar coluna de usuario em dieta_treino: {exc}")
     return "user_id"
-
 
 def _extract_conversation_insights(chat_rows, routine_rows, limit=4):
     insights = []
@@ -121,7 +114,6 @@ def _extract_conversation_insights(chat_rows, routine_rows, limit=4):
         )
 
     events.sort(key=lambda item: item["sort_time"], reverse=True)
-
     for event in events:
         key = (event["date"], event["activity"])
         if key in seen:
@@ -138,7 +130,6 @@ def _extract_conversation_insights(chat_rows, routine_rows, limit=4):
             break
 
     return insights
-
 
 def _build_weight_history(current_weight, routine_rows):
     today = datetime.now().date()
@@ -167,7 +158,6 @@ def _build_weight_history(current_weight, routine_rows):
         )
 
     return history
-
 
 @profile_bp.route("/perfil", methods=["GET"])
 @jwt_required()
@@ -219,7 +209,6 @@ def get_perfil():
     except Exception as e:
         logger.error(f"Erro ao buscar perfil: {e}")
         return jsonify({"error": "Falha ao buscar perfil"}), 500
-
 
 @profile_bp.route("/perfil", methods=["POST"])
 @jwt_required()
@@ -305,7 +294,6 @@ def update_perfil():
         logger.error(f"Erro ao atualizar perfil: {e}")
         return jsonify({"error": "Falha ao atualizar perfil"}), 500
 
-
 @profile_bp.route("/perfil", methods=["DELETE"])
 @jwt_required()
 def delete_perfil():
@@ -320,7 +308,6 @@ def delete_perfil():
     except Exception as e:
         logger.error(f"Erro ao excluir perfil: {e}")
         return jsonify({"error": "Falha ao excluir perfil"}), 500
-
 
 @profile_bp.route("/dashboard", methods=["GET"])
 @jwt_required()

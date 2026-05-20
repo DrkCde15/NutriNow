@@ -1,9 +1,7 @@
 import logging
 from datetime import datetime, timedelta
-
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
-
 from app.database import get_db
 from app.routes.calendar import delete_google_calendar_item, sync_google_calendar_item
 from app.services.runtime_cache import TTLCache

@@ -3,12 +3,10 @@ import os
 import re
 from datetime import date, datetime, timedelta
 from urllib.parse import quote, urlencode
-
 import requests
 from flask import Blueprint, current_app, jsonify, redirect, request, url_for
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
-
 from app.database import get_db
 from app.routes.auth import get_google_oauth_hosts
 from app.security import select_frontend_origin
@@ -57,12 +55,10 @@ CREATE TABLE IF NOT EXISTS google_calendar_events (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 """
 
-
 class GoogleCalendarError(Exception):
     def __init__(self, message, status_code=502):
         super().__init__(message)
         self.status_code = status_code
-
 
 def _ensure_google_calendar_tables(cursor):
     global _google_calendar_tables_ready
@@ -73,7 +69,6 @@ def _ensure_google_calendar_tables(cursor):
     cursor.execute(CREATE_GOOGLE_CALENDAR_EVENTS_TABLE_SQL)
     _google_calendar_tables_ready = True
 
-
 def _get_google_client_config():
     client_id = os.getenv("GOOGLE_CLIENT_ID") or os.getenv("CLIENT_ID")
     client_secret = os.getenv("GOOGLE_CLIENT_SECRET") or os.getenv("SECRET_KEY_CLIENT")
@@ -82,7 +77,6 @@ def _get_google_client_config():
         raise GoogleCalendarError("Credenciais OAuth do Google nao configuradas", 500)
 
     return client_id, client_secret
-
 
 def _get_state_serializer():
     secret = (
@@ -95,14 +89,11 @@ def _get_state_serializer():
         raise GoogleCalendarError("Chave de assinatura do app nao configurada", 500)
     return URLSafeTimedSerializer(secret)
 
-
 def _normalize_frontend_origin(value=None):
     return select_frontend_origin(value)
 
-
 def _get_frontend_origin():
     return _normalize_frontend_origin(request.headers.get("Origin") or request.referrer)
-
 
 def _calendar_redirect_uri():
     configured = os.getenv("GOOGLE_CALENDAR_REDIRECT_URI")
@@ -110,11 +101,9 @@ def _calendar_redirect_uri():
         return configured.strip()
     return url_for("google_calendar.google_calendar_callback", _external=True)
 
-
 def _frontend_redirect(origin, status):
     query = urlencode({"google_calendar": status})
     return f"{_normalize_frontend_origin(origin)}/calendario?{query}"
-
 
 def _request_google_token(payload):
     hosts = get_google_oauth_hosts()
@@ -130,7 +119,6 @@ def _request_google_token(payload):
         message = response.text
 
     raise GoogleCalendarError(f"Google OAuth recusou a solicitacao: {message}", response.status_code)
-
 
 def _build_authorization_url(user_id, origin):
     client_id, _ = _get_google_client_config()
@@ -154,7 +142,6 @@ def _build_authorization_url(user_id, origin):
     )
     return f"{hosts.authorization_endpoint}?{params}"
 
-
 def _to_datetime(value):
     if isinstance(value, datetime):
         return value
@@ -173,11 +160,9 @@ def _to_datetime(value):
                 continue
     return datetime.now()
 
-
 def _expires_at_from_payload(payload):
     expires_in = int(payload.get("expires_in") or 3600)
     return datetime.utcnow() + timedelta(seconds=expires_in)
-
 
 def _save_token_payload(cursor, user_id, payload, existing_refresh_token=None, calendar_id=DEFAULT_CALENDAR_ID):
     refresh_token = payload.get("refresh_token") or existing_refresh_token
@@ -210,7 +195,6 @@ def _save_token_payload(cursor, user_id, payload, existing_refresh_token=None, c
         ),
     )
 
-
 def _get_token_record(cursor, user_id):
     cursor.execute(
         """
@@ -221,7 +205,6 @@ def _get_token_record(cursor, user_id):
         (user_id,),
     )
     return cursor.fetchone()
-
 
 def _get_valid_access_token(cursor, conn, user_id):
     record = _get_token_record(cursor, user_id)
@@ -258,7 +241,6 @@ def _get_valid_access_token(cursor, conn, user_id):
     refreshed = _get_token_record(cursor, user_id)
     return payload["access_token"], refreshed
 
-
 def _resolve_dieta_user_column(cursor):
     try:
         return resolve_dieta_user_column(cursor)
@@ -266,10 +248,8 @@ def _resolve_dieta_user_column(cursor):
         logger.warning(f"Nao foi possivel detectar coluna de usuario em dieta_treino: {exc}")
     return "user_id"
 
-
 def _ensure_dieta_treino_schedule_columns(cursor):
     ensure_dieta_treino_schedule_columns(cursor)
-
 
 def _fetch_local_calendar_items(cursor, user_id):
     _ensure_dieta_treino_schedule_columns(cursor)
@@ -296,7 +276,6 @@ def _fetch_local_calendar_items(cursor, user_id):
     )
     return cursor.fetchall() or []
 
-
 def _item_start_datetime(item):
     start = _to_datetime(item.get("created_at"))
     time_value = str(item.get("time") or "").strip()
@@ -304,14 +283,11 @@ def _item_start_datetime(item):
     if re.fullmatch(r"\d{2}:\d{2}", time_value):
         hours, minutes = [int(part) for part in time_value.split(":")]
         start = start.replace(hour=hours, minute=minutes, second=0, microsecond=0)
-
     return start
-
 
 def _format_recurrence_until(value):
     if not value:
         return None
-
     if isinstance(value, datetime):
         until_date = value.date()
     elif isinstance(value, date):
@@ -321,9 +297,7 @@ def _format_recurrence_until(value):
             until_date = datetime.strptime(str(value)[:10], "%Y-%m-%d").date()
         except ValueError:
             return None
-
     return until_date.strftime("%Y%m%dT235959Z")
-
 
 def _parse_recurrence_days(value):
     days = []
@@ -332,7 +306,6 @@ def _parse_recurrence_days(value):
         if day in WEEKDAY_ORDER and day not in days:
             days.append(day)
     return days
-
 
 def _build_google_event(item, user_id):
     tipo = (item.get("tipo") or "").lower()
@@ -376,7 +349,6 @@ def _build_google_event(item, user_id):
 
     return event
 
-
 def _google_calendar_request(method, path, access_token, payload=None, params=None):
     url = f"https://www.googleapis.com/calendar/v3/{path.lstrip('/')}"
     response = requests.request(
@@ -409,7 +381,6 @@ def _google_calendar_request(method, path, access_token, payload=None, params=No
 
     raise GoogleCalendarError(message, response.status_code)
 
-
 def _get_event_mapping(cursor, user_id, item):
     cursor.execute(
         """
@@ -420,7 +391,6 @@ def _get_event_mapping(cursor, user_id, item):
         (user_id, item["id"], item["tipo"]),
     )
     return cursor.fetchone()
-
 
 def _upsert_event_mapping(cursor, user_id, item, google_event_id):
     cursor.execute(
@@ -434,7 +404,6 @@ def _upsert_event_mapping(cursor, user_id, item, google_event_id):
         """,
         (user_id, item["id"], item["tipo"], google_event_id),
     )
-
 
 def _sync_one_event(cursor, user_id, access_token, calendar_id, item):
     encoded_calendar_id = quote(calendar_id or DEFAULT_CALENDAR_ID, safe="")
@@ -463,7 +432,6 @@ def _sync_one_event(cursor, user_id, access_token, calendar_id, item):
     )
     _upsert_event_mapping(cursor, user_id, item, event["id"])
     return "created", event
-
 
 def sync_google_calendar_item(user_id, item_id):
     try:
@@ -515,7 +483,6 @@ def sync_google_calendar_item(user_id, item_id):
     except Exception as exc:
         logger.error(f"Erro inesperado na sincronizacao automatica do Google Calendar: {exc}")
         return {"synced": False, "reason": "server_error"}
-
 
 def delete_google_calendar_item(user_id, item_id, tipo=None):
     try:
@@ -575,7 +542,6 @@ def delete_google_calendar_item(user_id, item_id, tipo=None):
         logger.error(f"Erro inesperado ao remover evento do Google Calendar: {exc}")
         return {"deleted": False, "reason": "server_error"}
 
-
 @google_calendar_bp.route("/calendar/google/status", methods=["GET"])
 @jwt_required()
 def google_calendar_status():
@@ -610,7 +576,6 @@ def google_calendar_status():
         logger.error(f"Erro ao buscar status do Google Calendar: {exc}")
         return jsonify({"error": "Falha ao buscar status do Google Calendar"}), 500
 
-
 @google_calendar_bp.route("/calendar/google/connect", methods=["GET"])
 @jwt_required()
 def google_calendar_connect():
@@ -624,7 +589,6 @@ def google_calendar_connect():
     except Exception as exc:
         logger.error(f"Erro ao iniciar conexao com Google Calendar: {exc}")
         return jsonify({"error": "Falha ao iniciar conexao com Google Calendar"}), 500
-
 
 @google_calendar_bp.route("/calendar/google/callback", methods=["GET"])
 def google_calendar_callback():
@@ -683,7 +647,6 @@ def google_calendar_callback():
     except Exception as exc:
         logger.error(f"Erro inesperado no callback do Google Calendar: {exc}")
         return redirect(_frontend_redirect(target_origin, "error"))
-
 
 @google_calendar_bp.route("/calendar/google/sync", methods=["POST"])
 @jwt_required()
@@ -750,7 +713,6 @@ def google_calendar_sync():
     except Exception as exc:
         logger.error(f"Erro ao sincronizar Google Calendar: {exc}")
         return jsonify({"error": "Falha ao sincronizar Google Calendar"}), 500
-
 
 @google_calendar_bp.route("/calendar/google/disconnect", methods=["DELETE"])
 @jwt_required()

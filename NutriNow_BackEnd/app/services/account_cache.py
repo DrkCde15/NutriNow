@@ -5,10 +5,8 @@ from threading import Lock
 _cache = {}
 _cache_lock = Lock()
 
-
 def _ttl_seconds():
     return int(os.getenv("USER_ACCOUNT_CACHE_SECONDS", "120"))
-
 
 def get_cached_account(user_id):
     key = str(user_id)
@@ -25,7 +23,6 @@ def get_cached_account(user_id):
 
         return dict(entry["value"])
 
-
 def set_cached_account(user_id, account):
     ttl = _ttl_seconds()
     if ttl <= 0:
@@ -36,7 +33,6 @@ def set_cached_account(user_id, account):
             "expires_at": time.monotonic() + ttl,
             "value": dict(account),
         }
-
 
 def invalidate_cached_account(user_id):
     with _cache_lock:

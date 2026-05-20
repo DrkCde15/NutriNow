@@ -7,7 +7,6 @@ from datetime import date, datetime
 from typing import List, Optional, Dict
 import mysql.connector
 import requests
-
 from app.database import get_db_connection
 from app.services.schema_cache import get_table_columns, resolve_dieta_user_column
 

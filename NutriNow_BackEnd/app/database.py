@@ -1,7 +1,6 @@
 import os
 from contextlib import contextmanager
 from threading import Lock
-
 import mysql.connector
 from mysql.connector import pooling
 

@@ -5,7 +5,6 @@ import time
 from collections import defaultdict, deque
 from threading import Lock
 from urllib.parse import urlparse
-
 from flask import jsonify, request
 
 logger = logging.getLogger(__name__)

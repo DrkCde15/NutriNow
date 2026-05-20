@@ -1,8 +1,6 @@
 from dotenv import load_dotenv
-
 from app.database import get_db
 from app.services.db_schema import ensure_core_schema
-
 
 def main():
     load_dotenv()

@@ -1,7 +1,5 @@
 import os
-
 from dotenv import load_dotenv
-
 from app import create_app
 from app.security import env_flag
 

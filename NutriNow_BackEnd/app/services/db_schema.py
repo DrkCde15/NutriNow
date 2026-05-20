@@ -135,7 +135,6 @@ CORE_SCHEMA_SQL = [
     """,
 ]
 
-
 def ensure_core_schema(cursor):
     for statement in CORE_SCHEMA_SQL:
         cursor.execute(statement)

@@ -3,7 +3,6 @@ import os
 from html import escape
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
-
 from app.database import get_db
 from app.security import check_rate_limit, rate_limit_response
 from app.services.mail_service import envoyer_email
@@ -27,7 +26,6 @@ CREATE TABLE IF NOT EXISTS feedbacks (
     CONSTRAINT chk_feedbacks_rating CHECK (rating BETWEEN 1 AND 5)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 """
-
 
 def _notify_feedback_email(feedback_id, author_name, author_email, rating, message):
     recipient = (os.getenv("EMAIL_SENDER") or "").strip()
@@ -54,7 +52,6 @@ def _notify_feedback_email(feedback_id, author_name, author_email, rating, messa
     """
     return envoyer_email(recipient, subject, html_body)
 
-
 def _ensure_feedbacks_table(cursor):
     global _feedbacks_table_ready
     if _feedbacks_table_ready:
@@ -62,7 +59,6 @@ def _ensure_feedbacks_table(cursor):
 
     cursor.execute(CREATE_FEEDBACKS_TABLE_SQL)
     _feedbacks_table_ready = True
-
 
 @feedback_bp.route("/feedbacks", methods=["POST", "OPTIONS"])
 def create_feedback():
