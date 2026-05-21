@@ -171,12 +171,34 @@
     storage.setItem(key, JSON.stringify(value));
   }
 
+  function isLoopbackHost(hostname) {
+    return ["localhost", "127.0.0.1", "::1", "[::1]"].includes(hostname);
+  }
+
+  function isLoopbackUrl(value) {
+    try {
+      return isLoopbackHost(new URL(value, location.origin).hostname);
+    } catch {
+      return false;
+    }
+  }
+
   function getApiBase() {
-    const configured = localStorage.getItem(STORAGE.apiBase) || window.NUTRINOW_API_BASE || "";
+    const isLocalhost = isLoopbackHost(location.hostname);
+    const storedApiBase = localStorage.getItem(STORAGE.apiBase) || "";
+    if (storedApiBase) {
+      const normalized = storedApiBase.replace(/\/+$/, "");
+      if (!isLocalhost && isLoopbackUrl(normalized)) {
+        localStorage.removeItem(STORAGE.apiBase);
+      } else {
+        return normalized;
+      }
+    }
+
+    const configured = window.NUTRINOW_API_BASE || "";
     if (configured) return configured.replace(/\/+$/, "");
     if (!location.protocol.startsWith("http")) return "http://127.0.0.1:8000";
 
-    const isLocalhost = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
     if (isLocalhost && location.port && location.port !== "8000") return "http://127.0.0.1:8000";
 
     return location.origin;
@@ -849,6 +871,14 @@
         </select>
       </label>
     `;
+  }
+
+  function ensureAutocompleteAttributes(root = app) {
+    root.querySelectorAll("input, select, textarea").forEach((field) => {
+      if (field.hasAttribute("autocomplete")) return;
+      if (!field.getAttribute("name") && !field.getAttribute("id")) return;
+      field.setAttribute("autocomplete", "off");
+    });
   }
 
   function loginPage() {
@@ -1600,7 +1630,7 @@
               <button type="button" class="${item.tipo === "treino" ? "active workout" : ""}" data-calendar-type="treino">Treino</button>
               <button type="button" class="${item.tipo === "dieta" ? "active diet" : ""}" data-calendar-type="dieta">Dieta</button>
             </div>
-            <input type="hidden" name="tipo" value="${item.tipo}">
+            <input type="hidden" name="tipo" value="${item.tipo}" autocomplete="off">
             ${fieldMarkup("Título", "title", "text", { placeholder: item.tipo === "treino" ? "Ex: Treino de pernas" : "Ex: Almoço", value: item.title || "" })}
             <label class="field">
               <span class="label" style="margin-bottom:.4rem;">Descrição</span>
@@ -1616,7 +1646,7 @@
                 <button type="button" class="${!isWeekly ? "active" : ""}" data-recurrence="none">Único</button>
                 <button type="button" class="${isWeekly ? "active" : ""}" data-recurrence="weekly">Semanal</button>
               </div>
-              <input type="hidden" name="recurrenceType" value="${isWeekly ? "weekly" : "none"}">
+              <input type="hidden" name="recurrenceType" value="${isWeekly ? "weekly" : "none"}" autocomplete="off">
               <div data-weekly-options class="${isWeekly ? "" : "hidden"}" style="display:grid;gap:1rem;">
                 <div class="weekday-toggle-grid">
                   ${weekDayOptions
@@ -2262,6 +2292,7 @@
       "/feedbacks": feedbacksPage,
     };
     app.innerHTML = pages[path]();
+    ensureAutocompleteAttributes(app);
     bindPage();
     handleBackendRedirectParams(path);
     scheduleRouteLoads(path);
