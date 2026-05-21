@@ -150,6 +150,7 @@ NutriNow-2/
 |  |- init_db.py
 |  |- requirements.txt
 |  |- Procfile
+|  |- render-build.sh
 |  `- app/
 |     |- routes/
 |     `- services/
@@ -252,3 +253,17 @@ python App.py
 ```
 
 API local: `http://127.0.0.1:8000`
+
+## Deploy no Render em um unico Web Service
+
+Para o backend tambem servir o frontend estatico, crie um servico do tipo **Web Service** no Render e use:
+
+```text
+Root Directory: deixe vazio
+Build Command: bash NutriNow_BackEnd/render-build.sh
+Start Command: gunicorn --chdir NutriNow_BackEnd App:app
+```
+
+O script `render-build.sh` instala as dependencias Python, instala/prepara o frontend e gera `Nutrinow_Frontend/dist/`. O Flask serve esse `dist/` automaticamente pela mesma URL do backend.
+
+Nao configure **Publish Directory** nesse caso. Publish Directory e apenas para **Static Site** separado. Deixar o Root Directory vazio tambem faz mudancas no frontend dispararem deploy automatico.
