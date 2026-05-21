@@ -85,6 +85,8 @@
     chevronRight: '<path d="m9 18 6-6-6-6"/>',
     clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
     dumbbell: '<path d="m6.5 6.5 11 11"/><path d="m21 21-3-3"/><path d="m3 3 3 3"/><path d="m18 22 4-4"/><path d="M2 6l4-4"/><path d="m14 10 4-4"/><path d="m6 18 4-4"/>',
+    eye: '<path d="M2.06 12.35a1 1 0 0 1 0-.7C3.7 7.68 7.38 5 12 5s8.3 2.68 9.94 6.65a1 1 0 0 1 0 .7C20.3 16.32 16.62 19 12 19s-8.3-2.68-9.94-6.65Z"/><circle cx="12" cy="12" r="3"/>',
+    eyeOff: '<path d="m2 2 20 20"/><path d="M6.71 6.71C4.93 7.88 3.52 9.6 2.06 11.65a1 1 0 0 0 0 .7C3.7 16.32 7.38 19 12 19c1.87 0 3.57-.44 5.04-1.22"/><path d="M9.88 9.88A3 3 0 0 0 12 15a3 3 0 0 0 2.12-.88"/><path d="M14.12 9.88A3 3 0 0 0 9.88 14.12"/><path d="M12 5c4.62 0 8.3 2.68 9.94 6.65a1 1 0 0 1 0 .7 13.04 13.04 0 0 1-2.22 3.29"/>',
     imagePlus: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.5-3.5a2 2 0 0 0-2.8 0L6 20"/><path d="M17 5v6"/><path d="M14 8h6"/>',
     key: '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15 8 3 3"/><path d="m17 6 3 3"/>',
     layout: '<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
@@ -121,7 +123,7 @@
 
   function googleLogo() {
     return `
-      <svg class="icon-lg" viewBox="0 0 24 24" aria-hidden="true">
+      <svg class="google-logo" viewBox="0 0 24 24" aria-hidden="true">
         <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
         <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
         <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
@@ -793,7 +795,13 @@
 
   function fieldMarkup(label, name, type = "text", options = {}) {
     const iconMarkup = options.icon ? icon(options.icon) : "";
-    const inputClass = `input ${options.icon ? "has-icon" : ""}`;
+    const hasPasswordToggle = type === "password" || options.passwordToggle;
+    const inputClass = `input ${options.icon ? "has-icon" : ""} ${hasPasswordToggle ? "has-action" : ""}`;
+    const hintMarkup = options.passwordStrength
+      ? `<span class="hint password-strength-hint" data-password-strength="true" data-min-length="${options.minLength || 10}"><span class="hint-check" aria-hidden="true">${icon("check")}</span>${escapeHtml(options.passwordStrength)}</span>`
+      : options.hint
+        ? `<span class="hint">${options.hint}</span>`
+        : "";
     const attrs = [
       `name="${name}"`,
       `id="${name}"`,
@@ -804,6 +812,7 @@
       options.value != null ? `value="${escapeHtml(options.value)}"` : "",
       options.step ? `step="${options.step}"` : "",
       options.min != null ? `min="${options.min}"` : "",
+      options.passwordStrength ? 'data-password-strength-input="true"' : "",
     ]
       .filter(Boolean)
       .join(" ");
@@ -811,11 +820,16 @@
       <label class="field">
         <div class="field-label-row">
           <span class="label">${label}</span>
-          ${options.hint ? `<span class="hint">${options.hint}</span>` : ""}
+          ${hintMarkup}
         </div>
         <div class="input-wrap">
           ${iconMarkup}
           <input ${attrs}>
+          ${
+            hasPasswordToggle
+              ? `<button class="password-toggle" type="button" data-action="toggle-password" aria-label="Mostrar senha" aria-pressed="false">${icon("eye")}</button>`
+              : ""
+          }
         </div>
       </label>
     `;
@@ -868,7 +882,7 @@
           ${selectFieldMarkup("Gênero", "genero", ["Masculino", "Feminino"], "Masculino")}
         </div>
         ${fieldMarkup("Email", "email", "email", { icon: "mail", placeholder: "Email" })}
-        ${fieldMarkup("Senha", "senha", "password", { icon: "lock", placeholder: "Senha", hint: `${icon("check")} Mínimo de 10 caracteres` })}
+        ${fieldMarkup("Senha", "senha", "password", { icon: "lock", placeholder: "Senha", passwordStrength: "Mínimo de 10 caracteres" })}
         <div class="grid-2">
           ${fieldMarkup("Meta", "meta", "text", { required: false, placeholder: "Meta", value: "Não definida" })}
           ${selectFieldMarkup("Já treinou?", "jaTreinou", ["Nunca treinou", "Iniciante", "Intermediário", "Avançado"], "Nunca treinou", false)}
@@ -922,7 +936,7 @@
       `
       : `
         <form class="form" data-form="reset">
-          ${fieldMarkup("Nova senha", "senha", "password", { icon: "lock", placeholder: "********" })}
+          ${fieldMarkup("Nova senha", "senha", "password", { icon: "lock", placeholder: "********", passwordStrength: "Mínimo de 10 caracteres" })}
           ${fieldMarkup("Confirmar nova senha", "confirmar", "password", { icon: "lock", placeholder: "********" })}
           <div data-form-error></div>
           <button class="btn btn-primary" type="submit">${icon("key")} Atualizar senha</button>
@@ -2370,6 +2384,7 @@
       input.addEventListener("input", () => updateBmi(input.closest("[data-bmi]")));
     });
 
+    bindPasswordControls();
     bindAuth();
     bindPlans();
     bindCalendar();
@@ -2382,6 +2397,34 @@
   function setFormError(form, message) {
     const target = form.querySelector("[data-form-error]");
     if (target) target.innerHTML = message ? `<div class="alert">${icon("alert")} ${escapeHtml(message)}</div>` : "";
+  }
+
+  function bindPasswordControls() {
+    app.querySelectorAll('[data-action="toggle-password"]').forEach((button) => {
+      button.addEventListener("click", () => {
+        const input = button.closest(".input-wrap")?.querySelector("input");
+        if (!input) return;
+        const wasHidden = input.type === "password";
+        input.type = wasHidden ? "text" : "password";
+        button.innerHTML = icon(wasHidden ? "eyeOff" : "eye");
+        button.setAttribute("aria-label", wasHidden ? "Ocultar senha" : "Mostrar senha");
+        button.setAttribute("aria-pressed", String(wasHidden));
+        input.focus();
+      });
+    });
+
+    app.querySelectorAll("[data-password-strength-input]").forEach((input) => {
+      const updateStrength = () => {
+        const hint = input.closest(".field")?.querySelector("[data-password-strength]");
+        if (!hint) return;
+        const minLength = Number(hint.dataset.minLength || 10);
+        const isStrong = input.value.length >= minLength;
+        hint.classList.toggle("is-strong", isStrong);
+        hint.setAttribute("aria-label", isStrong ? "Senha forte" : "Senha ainda fraca");
+      };
+      updateStrength();
+      input.addEventListener("input", updateStrength);
+    });
   }
 
   function bindAuth() {
