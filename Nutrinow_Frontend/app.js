@@ -174,8 +174,12 @@
   function getApiBase() {
     const configured = localStorage.getItem(STORAGE.apiBase) || window.NUTRINOW_API_BASE || "";
     if (configured) return configured.replace(/\/+$/, "");
-    if (location.protocol.startsWith("http") && location.port === "8000") return location.origin;
-    return "http://127.0.0.1:8000";
+    if (!location.protocol.startsWith("http")) return "http://127.0.0.1:8000";
+
+    const isLocalhost = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
+    if (isLocalhost && location.port && location.port !== "8000") return "http://127.0.0.1:8000";
+
+    return location.origin;
   }
 
   function getToken() {
@@ -812,6 +816,7 @@
       options.value != null ? `value="${escapeHtml(options.value)}"` : "",
       options.step ? `step="${options.step}"` : "",
       options.min != null ? `min="${options.min}"` : "",
+      `autocomplete="${escapeHtml(options.autocomplete || "off")}"`,
       options.passwordStrength ? 'data-password-strength-input="true"' : "",
     ]
       .filter(Boolean)
@@ -835,11 +840,11 @@
     `;
   }
 
-  function selectFieldMarkup(label, name, values, selected = "", required = true) {
+  function selectFieldMarkup(label, name, values, selected = "", required = true, options = {}) {
     return `
       <label class="field">
         <span class="label" style="margin-bottom:.4rem;">${label}</span>
-        <select class="select" name="${name}" ${required ? "required" : ""}>
+        <select class="select" name="${name}" ${required ? "required" : ""} autocomplete="${escapeHtml(options.autocomplete || "off")}">
           ${values.map((value) => `<option value="${escapeHtml(value)}" ${value === selected ? "selected" : ""}>${escapeHtml(value)}</option>`).join("")}
         </select>
       </label>
@@ -852,8 +857,8 @@
       "Entre na sua conta para continuar sua jornada.",
       `
       <form class="form" data-form="login">
-        ${fieldMarkup("Email", "email", "email", { icon: "mail", placeholder: "seu@email.com" })}
-        ${fieldMarkup("Senha", "senha", "password", { icon: "lock", placeholder: "••••••••" })}
+        ${fieldMarkup("Email", "email", "email", { icon: "mail", placeholder: "seu@email.com", autocomplete: "email" })}
+        ${fieldMarkup("Senha", "senha", "password", { icon: "lock", placeholder: "••••••••", autocomplete: "current-password" })}
         <div style="display:flex;justify-content:flex-end;">
           <a href="/esqueci-senha" data-link class="text-primary" style="font-size:.9rem;font-weight:700;">Esqueci minha senha</a>
         </div>
@@ -874,15 +879,15 @@
       `
       <form class="form" data-form="cadastro">
         <div class="grid-2">
-          ${fieldMarkup("Nome", "nome", "text", { icon: "user", placeholder: "Nome" })}
-          ${fieldMarkup("Sobrenome", "sobrenome", "text", { icon: "user", placeholder: "Sobrenome" })}
+          ${fieldMarkup("Nome", "nome", "text", { icon: "user", placeholder: "Nome", autocomplete: "given-name" })}
+          ${fieldMarkup("Sobrenome", "sobrenome", "text", { icon: "user", placeholder: "Sobrenome", autocomplete: "family-name" })}
         </div>
         <div class="grid-2">
-          ${fieldMarkup("Data de nascimento", "dataNascimento", "date")}
-          ${selectFieldMarkup("Gênero", "genero", ["Masculino", "Feminino"], "Masculino")}
+          ${fieldMarkup("Data de nascimento", "dataNascimento", "date", { autocomplete: "bday" })}
+          ${selectFieldMarkup("Gênero", "genero", ["Masculino", "Feminino"], "Masculino", true, { autocomplete: "sex" })}
         </div>
-        ${fieldMarkup("Email", "email", "email", { icon: "mail", placeholder: "Email" })}
-        ${fieldMarkup("Senha", "senha", "password", { icon: "lock", placeholder: "Senha", passwordStrength: "Mínimo de 10 caracteres" })}
+        ${fieldMarkup("Email", "email", "email", { icon: "mail", placeholder: "Email", autocomplete: "email" })}
+        ${fieldMarkup("Senha", "senha", "password", { icon: "lock", placeholder: "Senha", autocomplete: "new-password", passwordStrength: "Mínimo de 10 caracteres" })}
         <div class="grid-2">
           ${fieldMarkup("Meta", "meta", "text", { required: false, placeholder: "Meta", value: "Não definida" })}
           ${selectFieldMarkup("Já treinou?", "jaTreinou", ["Nunca treinou", "Iniciante", "Intermediário", "Avançado"], "Nunca treinou", false)}
@@ -912,7 +917,7 @@
       `
       : `
         <form class="form" data-form="forgot">
-          ${fieldMarkup("Email cadastrado", "email", "email", { icon: "mail", placeholder: "seu@email.com" })}
+          ${fieldMarkup("Email cadastrado", "email", "email", { icon: "mail", placeholder: "seu@email.com", autocomplete: "email" })}
           <button class="btn btn-primary" type="submit">${icon("send")} Enviar link de recuperação</button>
           <div data-form-error></div>
         </form>
@@ -936,8 +941,8 @@
       `
       : `
         <form class="form" data-form="reset">
-          ${fieldMarkup("Nova senha", "senha", "password", { icon: "lock", placeholder: "********", passwordStrength: "Mínimo de 10 caracteres" })}
-          ${fieldMarkup("Confirmar nova senha", "confirmar", "password", { icon: "lock", placeholder: "********" })}
+          ${fieldMarkup("Nova senha", "senha", "password", { icon: "lock", placeholder: "********", autocomplete: "new-password", passwordStrength: "Mínimo de 10 caracteres" })}
+          ${fieldMarkup("Confirmar nova senha", "confirmar", "password", { icon: "lock", placeholder: "********", autocomplete: "new-password" })}
           <div data-form-error></div>
           <button class="btn btn-primary" type="submit">${icon("key")} Atualizar senha</button>
         </form>
@@ -1359,7 +1364,7 @@
             ${fieldMarkup("Título", "title", "text", { placeholder: state.planTab === "treino" ? "Ex: Treino de pernas" : "Ex: Café da manhã", value: item.title || "" })}
             <label class="field">
               <span class="label" style="margin-bottom:.4rem;">Descrição</span>
-              <textarea name="description" class="textarea" required placeholder="Detalhes...">${escapeHtml(item.description || "")}</textarea>
+              <textarea name="description" class="textarea" required autocomplete="off" placeholder="Detalhes...">${escapeHtml(item.description || "")}</textarea>
             </label>
             ${fieldMarkup("Horário (opcional)", "time", "text", { required: false, placeholder: "Ex: 08:00 ou Pós-treino", value: item.time || "" })}
             <div class="modal-actions">
@@ -1599,7 +1604,7 @@
             ${fieldMarkup("Título", "title", "text", { placeholder: item.tipo === "treino" ? "Ex: Treino de pernas" : "Ex: Almoço", value: item.title || "" })}
             <label class="field">
               <span class="label" style="margin-bottom:.4rem;">Descrição</span>
-              <textarea name="description" class="textarea" required placeholder="Detalhes...">${escapeHtml(item.description || "")}</textarea>
+              <textarea name="description" class="textarea" required autocomplete="off" placeholder="Detalhes...">${escapeHtml(item.description || "")}</textarea>
             </label>
             <div class="grid-2">
               ${fieldMarkup("Data", "scheduleDate", "date", { value: item.scheduleDate || todayInput() })}
@@ -1679,7 +1684,7 @@
             </div>
             <div class="chat-sidebar-actions">
               <button class="btn btn-primary" data-action="new-chat">${icon("plus")} Novo chat</button>
-              <label class="chat-search">${icon("search")}<input value="${escapeHtml(state.chatSearch)}" data-chat-search placeholder="Buscar chats"></label>
+              <label class="chat-search">${icon("search")}<input value="${escapeHtml(state.chatSearch)}" data-chat-search autocomplete="off" placeholder="Buscar chats"></label>
             </div>
             <div class="chat-history">
               <p class="history-title">Recentes</p>
@@ -1716,7 +1721,7 @@
                   ${icon("imagePlus", "icon-lg")}
                   <input type="file" accept="image/*" class="hidden" data-chat-file>
                 </label>
-                <input type="text" name="message" placeholder="Pergunte algo à NutriAI...">
+                <input type="text" name="message" autocomplete="off" placeholder="Pergunte algo à NutriAI...">
                 <button class="icon-btn btn-primary" type="submit" aria-label="Enviar" style="border:0;">${icon("send", "icon-lg")}</button>
               </div>
             </form>
@@ -2105,14 +2110,14 @@
             ${state.profile.error ? `<div class="alert" style="margin-bottom:1rem;">${icon("alert")} ${escapeHtml(state.profile.error)}</div>` : ""}
             <form class="form" data-form="profile">
               <div class="grid-2">
-                ${fieldMarkup("Nome", "nome", "text", { icon: "user", value: user.nome || "" })}
-                ${fieldMarkup("Sobrenome", "sobrenome", "text", { value: user.sobrenome || "" })}
+                ${fieldMarkup("Nome", "nome", "text", { icon: "user", value: user.nome || "", autocomplete: "given-name" })}
+                ${fieldMarkup("Sobrenome", "sobrenome", "text", { value: user.sobrenome || "", autocomplete: "family-name" })}
               </div>
               <div class="grid-2">
-                ${selectFieldMarkup("Gênero", "genero", ["Masculino", "Feminino"], user.genero || "Masculino")}
-                ${fieldMarkup("Data de nascimento", "dataNascimento", "date", { value: user.dataNascimento || "" })}
+                ${selectFieldMarkup("Gênero", "genero", ["Masculino", "Feminino"], user.genero || "Masculino", true, { autocomplete: "sex" })}
+                ${fieldMarkup("Data de nascimento", "dataNascimento", "date", { value: user.dataNascimento || "", autocomplete: "bday" })}
               </div>
-              ${fieldMarkup("Email", "email", "email", { icon: "mail", value: user.email || "" })}
+              ${fieldMarkup("Email", "email", "email", { icon: "mail", value: user.email || "", autocomplete: "email" })}
               <div class="grid-2">
                 ${fieldMarkup("Meta", "meta", "text", { required: false, value: user.meta || "Não definida" })}
                 ${selectFieldMarkup("Já treinou?", "jaTreinou", ["Nunca treinou", "Iniciante", "Intermediário", "Avançado"], user.jaTreinou || "Nunca treinou", false)}
@@ -2206,10 +2211,10 @@
                             .join("")}
                         </div>
                       </div>
-                      ${fieldMarkup("Nome (opcional)", "name", "text", { required: false, placeholder: "Seu nome" })}
+                      ${fieldMarkup("Nome (opcional)", "name", "text", { required: false, placeholder: "Seu nome", autocomplete: "name" })}
                       <label class="field">
                         <span class="label" style="margin-bottom:.4rem;">Mensagem</span>
-                        <textarea name="message" class="textarea" required placeholder="Escreva seu feedback aqui..."></textarea>
+                        <textarea name="message" class="textarea" required autocomplete="off" placeholder="Escreva seu feedback aqui..."></textarea>
                       </label>
                       <div data-form-error></div>
                       <button class="btn btn-primary" type="submit">${icon("send")} Enviar feedback</button>

@@ -6,6 +6,7 @@ from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.middleware.proxy_fix import ProxyFix
 from app.routes.auth import auth_bp
 from app.routes.chatbot import chatbot_bp
 from app.routes.profile import profile_bp
@@ -34,6 +35,9 @@ def _secret_or_dev_fallback(name, fallback=None):
 def create_app():
     load_dotenv()
     app = Flask(__name__)
+
+    if env_flag("TRUST_PROXY_HEADERS", not is_development()):
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1, x_prefix=1)
 
     app.secret_key = _secret_or_dev_fallback("FLASK_SECRET_KEY")
 

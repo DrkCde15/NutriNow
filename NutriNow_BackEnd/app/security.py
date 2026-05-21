@@ -5,12 +5,16 @@ import time
 from collections import defaultdict, deque
 from threading import Lock
 from urllib.parse import urlparse
-from flask import jsonify, request
+from flask import has_request_context, jsonify, request
 
 logger = logging.getLogger(__name__)
 
 DEPLOYED_FRONTEND_ORIGINS = [
     "https://nutrinow-app.jcesarsantana215.workers.dev",
+]
+
+PLATFORM_FRONTEND_ENV_NAMES = [
+    "RENDER_EXTERNAL_URL",
 ]
 
 LOCAL_FRONTEND_ORIGINS = [
@@ -84,6 +88,10 @@ def _configured_origin_values():
         raw = os.getenv(name, "")
         for item in raw.split(","):
             yield item.strip()
+    for name in PLATFORM_FRONTEND_ENV_NAMES:
+        raw = os.getenv(name, "")
+        for item in raw.split(","):
+            yield item.strip()
 
 
 def _configured_origins():
@@ -100,7 +108,7 @@ def _configured_frontend_url():
         else ["FRONTEND_URL_PROD", "CORS_ORIGIN_PROD"]
     )
 
-    for name in [*env_names, "FRONTEND_URL", "CORS_ORIGIN"]:
+    for name in [*env_names, "FRONTEND_URL", "CORS_ORIGIN", *PLATFORM_FRONTEND_ENV_NAMES]:
         item = os.getenv(name, "")
         origin = normalize_origin(item)
         if origin:
@@ -141,14 +149,21 @@ def get_request_origin():
     return normalize_origin(request.headers.get("Origin") or request.referrer)
 
 
+def get_current_host_origin():
+    if not has_request_context():
+        return None
+    return normalize_origin(request.host_url)
+
+
 def select_frontend_origin(candidate=None, strict=False):
     allowed_origins = build_allowed_origins()
     origin = normalize_origin(candidate)
+    current_host_origin = get_current_host_origin()
 
-    if origin and origin in allowed_origins:
+    if origin and (origin in allowed_origins or origin == current_host_origin):
         return origin
 
-    fallback = normalize_origin(_configured_frontend_url()) or allowed_origins[0]
+    fallback = current_host_origin or normalize_origin(_configured_frontend_url()) or allowed_origins[0]
     if strict and origin:
         raise ValueError("Origem de frontend nao permitida")
 
