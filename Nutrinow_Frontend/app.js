@@ -36,6 +36,8 @@
     chatSidebarOpen: false,
     chatSearch: "",
     chatTyping: false,
+    chatCalendarMessage: "",
+    chatCalendarError: "",
     feedbackRating: 0,
     feedbackSubmitted: false,
     recoverySent: false,
@@ -221,6 +223,8 @@
     state.googleStatus = { loaded: false, loading: false, data: null, error: "" };
     state.chatSessions = { loaded: false, loading: false, items: null, error: "" };
     state.chatHistory = {};
+    state.chatCalendarMessage = "";
+    state.chatCalendarError = "";
   }
 
   function getErrorMessage(error, fallback = "Erro ao comunicar com o backend") {
@@ -1731,6 +1735,7 @@
               ${messages.map((message) => chatMessageMarkup(message, user)).join("")}
               ${state.chatTyping ? typingMarkup() : ""}
             </div>
+            ${chatCalendarNoticeMarkup()}
             ${
               hasOnlyWelcome
                 ? `<div class="suggestions">
@@ -1757,6 +1762,7 @@
             </form>
           </section>
         </main>
+        ${calendarModalMarkup()}
       </div>
     `;
   }
@@ -1891,8 +1897,38 @@
             <span class="bubble-head-icon">${icon("sparkles")}</span>
           </div>
           <div class="bubble-body">${renderMessageText(message.text)}</div>
+          ${workoutCalendarActionsMarkup(message)}
           <div class="bubble-footer"><span>Resposta</span><span>${time}</span></div>
         </div>
+      </div>
+    `;
+  }
+
+  function chatCalendarNoticeMarkup() {
+    const message = state.chatCalendarError || state.chatCalendarMessage;
+    if (!message) return "";
+    const isError = Boolean(state.chatCalendarError);
+    return `
+      <div class="chat-calendar-notice ${isError ? "alert" : "success-box"}">
+        <span>${icon(isError ? "alert" : "checkCircle")} ${escapeHtml(message)}</span>
+        <div class="chat-calendar-notice-actions">
+          ${isError ? "" : `<a href="/calendario" data-link>Ver calendário</a>`}
+          <button type="button" class="mini-icon" data-action="dismiss-chat-calendar-notice" aria-label="Fechar aviso">${icon("x")}</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function workoutCalendarActionsMarkup(message) {
+    if (!shouldOfferWorkoutCalendarAction(message)) return "";
+    return `
+      <div class="chat-calendar-actions" role="group" aria-label="Adicionar treino ao calendário">
+        <button type="button" class="chat-calendar-action primary" data-action="add-ai-workout" data-id="${escapeHtml(message.id)}" data-recurring="false">
+          ${icon("calendar")} Adicionar treino
+        </button>
+        <button type="button" class="chat-calendar-action secondary" data-action="add-ai-workout" data-id="${escapeHtml(message.id)}" data-recurring="true">
+          ${icon("refresh")} Criar rotina
+        </button>
       </div>
     `;
   }
@@ -2069,6 +2105,189 @@
       .replace(/[^\w\s-]/g, " ")
       .replace(/\s+/g, " ")
       .trim();
+  }
+
+  function shouldOfferWorkoutCalendarAction(message) {
+    if (!message || message.isUser || message.id === "welcome") return false;
+    const normalized = normalizeText(message.text);
+    if (!normalized) return false;
+    if (["erro ao", "indisponivel", "instabilidade", "temporariamente"].some((term) => normalized.includes(term))) {
+      return false;
+    }
+
+    const workoutHints = [
+      "treino",
+      "treinos",
+      "rotina",
+      "exercicio",
+      "exercicios",
+      "serie",
+      "series",
+      "agachamento",
+      "flexao",
+      "prancha",
+      "alongamento",
+      "cardio",
+      "corrida",
+      "caminhada",
+      "musculacao",
+      "supino",
+      "remada",
+    ];
+    const hasWorkoutHint = workoutHints.some((term) => normalized.includes(term));
+    if (!hasWorkoutHint) return false;
+
+    return /(^|\n)\s*([-*]|\d+[.)])\s+/.test(String(message.text || ""))
+      || ["minuto", "minutos", "semana", "aquecimento", "alongamento"].some((term) => normalized.includes(term));
+  }
+
+  function plainMessageText(text) {
+    return String(text || "")
+      .replace(/\r\n/g, "\n")
+      .split("\n")
+      .map((line) => line
+        .replace(/^\s{0,3}#{1,6}\s+/, "")
+        .replace(/^\s*>\s?/, "")
+        .replace(/^\s*[-*]\s+/, "- ")
+        .replace(/^\s*\d+[.)]\s+/, "")
+        .replace(/\*\*([^*]+)\*\*/g, "$1")
+        .replace(/__([^_]+)__/g, "$1")
+        .replace(/`([^`]+)`/g, "$1")
+        .replace(/\*\*/g, "")
+        .replace(/__/g, "")
+        .replace(/\|/g, " ")
+        .trim())
+      .filter(Boolean)
+      .join("\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
+
+  function extractWorkoutTitle(text) {
+    const lines = plainMessageText(text).split("\n").map((line) => line.trim()).filter(Boolean);
+    const candidate = lines.find((line) => {
+      const normalized = normalizeText(line);
+      return normalized.includes("treino") || normalized.includes("rotina");
+    }) || lines[0] || "Treino sugerido pela NutriAI";
+
+    let title = candidate
+      .replace(/^claro[!,.]?\s*/i, "")
+      .replace(/^aqui\s+(esta|vai)\s+/i, "")
+      .replace(/:$/, "")
+      .trim();
+
+    if (!title) title = "Treino sugerido pela NutriAI";
+    const normalizedTitle = normalizeText(title);
+    if (!normalizedTitle.includes("treino") && !normalizedTitle.includes("rotina")) {
+      title = `Treino: ${title}`;
+    }
+    return title.length > 72 ? `${title.slice(0, 69).trim()}...` : title;
+  }
+
+  function inferWorkoutDurationMinutes(text) {
+    const normalized = normalizeText(text);
+    const candidates = [];
+
+    for (const match of normalized.matchAll(/\b(\d{1,2})\s*h(?:\s*(\d{1,2})\s*(?:min|minuto|minutos))?/g)) {
+      candidates.push(Number(match[1]) * 60 + (Number(match[2]) || 0));
+    }
+
+    for (const match of normalized.matchAll(/\b(\d{1,3})\s*(?:min|minuto|minutos)\b/g)) {
+      candidates.push(Number(match[1]));
+    }
+
+    const duration = candidates.find((minutes) => minutes >= 15 && minutes <= 12 * 60);
+    return duration || 60;
+  }
+
+  function inferWorkoutTime(text) {
+    const plain = plainMessageText(text);
+    const explicit = plain.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
+    if (explicit) return `${String(Number(explicit[1])).padStart(2, "0")}:${explicit[2]}`;
+
+    const normalized = normalizeText(text);
+    if (normalized.includes("manha")) return "08:00";
+    if (normalized.includes("tarde")) return "17:00";
+    if (normalized.includes("noite")) return "19:00";
+    return "08:00";
+  }
+
+  function inferWorkoutWeekdays(text) {
+    const normalized = normalizeText(text);
+    if (/\b(todos os dias|diario|diaria)\b/.test(normalized)) {
+      return ["MO", "TU", "WE", "TH", "FR", "SA", "SU"];
+    }
+    if (normalized.includes("dias alternados")) return ["MO", "WE", "FR"];
+
+    const aliases = [
+      ["MO", ["seg", "segunda", "segundas"]],
+      ["TU", ["ter", "terca", "tercas"]],
+      ["WE", ["qua", "quarta", "quartas"]],
+      ["TH", ["qui", "quinta", "quintas"]],
+      ["FR", ["sex", "sexta", "sextas"]],
+      ["SA", ["sab", "sabado", "sabados"]],
+      ["SU", ["dom", "domingo", "domingos"]],
+    ];
+
+    return aliases
+      .filter(([, names]) => names.some((name) => new RegExp(`\\b${name}\\b`).test(normalized)))
+      .map(([code]) => code);
+  }
+
+  function nextDateForWeekdays(days) {
+    if (!days.length) return new Date();
+    for (let offset = 0; offset < 7; offset += 1) {
+      const candidate = addDays(new Date(), offset);
+      if (days.includes(jsDayToGoogleDay[candidate.getDay()])) return candidate;
+    }
+    return new Date();
+  }
+
+  function inferWorkoutStartDate(text, days = []) {
+    const normalized = normalizeText(text);
+    if (normalized.includes("amanha")) return todayInput(addDays(new Date(), 1));
+    if (normalized.includes("hoje")) return todayInput();
+    return todayInput(nextDateForWeekdays(days));
+  }
+
+  function defaultWorkoutWeekdays(recurring) {
+    return recurring ? ["MO", "WE", "FR"] : [jsDayToGoogleDay[new Date().getDay()]];
+  }
+
+  function buildWorkoutCalendarItem(text, recurring = false) {
+    const inferredDays = inferWorkoutWeekdays(text);
+    const recurrenceDays = inferredDays.length ? inferredDays : defaultWorkoutWeekdays(recurring);
+    const description = plainMessageText(text) || "Treino sugerido pela NutriAI.";
+    return {
+      tipo: "treino",
+      title: extractWorkoutTitle(text),
+      description,
+      scheduleDate: inferWorkoutStartDate(text, inferredDays.length || recurring ? recurrenceDays : []),
+      time: inferWorkoutTime(text),
+      durationMinutes: inferWorkoutDurationMinutes(text),
+      recurrenceType: recurring ? "weekly" : "none",
+      recurrenceDays,
+      recurrenceUntil: recurring ? todayInput(addDays(new Date(), 84)) : "",
+    };
+  }
+
+  function currentChatMessages() {
+    const sessionId = getCurrentSessionId();
+    if (state.chatHistory[sessionId]) return state.chatHistory[sessionId];
+    return getChatSessions().find((session) => session.id === sessionId)?.messages || [];
+  }
+
+  function findCurrentChatMessage(messageId) {
+    return currentChatMessages().find((message) => String(message.id) === String(messageId));
+  }
+
+  function openAiWorkoutCalendarModal(message, recurring) {
+    const item = buildWorkoutCalendarItem(message.text, recurring);
+    state.calendarModal = { mode: "new", item };
+    state.calendarWeekdays = item.recurrenceType === "weekly" ? item.recurrenceDays : [];
+    state.chatCalendarMessage = "";
+    state.chatCalendarError = "";
+    render();
   }
 
   function botResponse(text) {
@@ -2802,6 +3021,7 @@
     if (form) {
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
+        const openedFromChat = normalizePath(getCurrentPath()) === "/chat";
         const data = new FormData(form);
         const recurrenceType = String(data.get("recurrenceType") || "none");
         const activeDays = Array.from(form.querySelectorAll("[data-weekday].active")).map((node) => node.dataset.weekday);
@@ -2818,14 +3038,15 @@
           recurrenceUntil: recurrenceType === "weekly" ? String(data.get("recurrenceUntil") || "") : "",
         };
         const button = form.querySelector('button[type="submit"]');
+        const editingCalendarItem = state.calendarModal.mode === "edit";
         button.disabled = true;
         try {
           const result = await apiRequest(
-            state.calendarModal.mode === "edit"
+            editingCalendarItem
               ? `/dieta-treino/${state.calendarModal.item.id}`
               : "/dieta-treino",
             {
-              method: state.calendarModal.mode === "edit" ? "PUT" : "POST",
+              method: editingCalendarItem ? "PUT" : "POST",
               body: JSON.stringify({
                 tipo: payload.tipo,
                 title: payload.title,
@@ -2842,18 +3063,32 @@
           state.plans.treino = null;
           state.plans.dieta = null;
           await loadBothPlanTypes(true);
-          state.googleMessage = result.googleCalendar?.synced
-            ? state.calendarModal.mode === "edit"
-              ? "Item atualizado e sincronizado com Google Calendar."
-              : "Item criado e sincronizado com Google Calendar."
-            : state.calendarModal.mode === "edit"
-              ? "Item atualizado no calendário do NutriNow."
-              : "Item criado no calendário do NutriNow.";
+          const itemLabel = payload.tipo === "treino" ? "Treino" : "Item";
+          const successMessage = result.googleCalendar?.synced
+            ? editingCalendarItem
+              ? `${itemLabel} atualizado e sincronizado com Google Calendar.`
+              : `${itemLabel} criado e sincronizado com Google Calendar.`
+            : editingCalendarItem
+              ? `${itemLabel} atualizado no calendário do NutriNow.`
+              : `${itemLabel} criado no calendário do NutriNow.`;
+          const syncError = result.googleCalendar?.reason && result.googleCalendar.reason !== "not_connected"
+            ? result.googleCalendar?.error || ""
+            : "";
+          state.googleMessage = successMessage;
           state.googleError = result.googleCalendar?.error || "";
+          if (openedFromChat) {
+            state.chatCalendarMessage = successMessage;
+            state.chatCalendarError = syncError;
+          }
           state.calendarModal = null;
         } catch (error) {
-          state.googleError = getErrorMessage(error, "Erro ao salvar item");
+          const errorMessage = getErrorMessage(error, "Erro ao salvar item");
+          state.googleError = errorMessage;
           state.googleMessage = "";
+          if (openedFromChat) {
+            state.chatCalendarError = getErrorMessage(error, "Erro ao salvar treino no calendário");
+            state.chatCalendarMessage = "";
+          }
         } finally {
           button.disabled = false;
         }
@@ -2921,6 +3156,27 @@
 
     app.querySelectorAll("[data-suggestion]").forEach((button) => {
       button.addEventListener("click", () => sendChatMessage(button.dataset.suggestion));
+    });
+
+    app.querySelectorAll('[data-action="add-ai-workout"]').forEach((button) => {
+      button.addEventListener("click", () => {
+        const message = findCurrentChatMessage(button.dataset.id);
+        if (!message) {
+          state.chatCalendarError = "Nao foi possivel localizar esse treino na conversa.";
+          state.chatCalendarMessage = "";
+          render();
+          return;
+        }
+        openAiWorkoutCalendarModal(message, button.dataset.recurring === "true");
+      });
+    });
+
+    app.querySelectorAll('[data-action="dismiss-chat-calendar-notice"]').forEach((button) => {
+      button.addEventListener("click", () => {
+        state.chatCalendarMessage = "";
+        state.chatCalendarError = "";
+        render();
+      });
     });
 
     const chatForm = app.querySelector('[data-form="chat"]');

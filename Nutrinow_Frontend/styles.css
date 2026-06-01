@@ -2218,6 +2218,72 @@ button.icon-btn.mobile-menu-button {
   text-transform: uppercase;
 }
 
+.chat-calendar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+  border-top: 1px solid #e6f7ef;
+  padding-top: 0.75rem;
+}
+
+.chat-calendar-action {
+  display: inline-flex;
+  min-height: 2.35rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border: 1px solid #b7ebd6;
+  border-radius: 0.75rem;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
+.chat-calendar-action.primary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.chat-calendar-action.secondary {
+  border-color: #bae6fd;
+  background: #f0f9ff;
+  color: #082f49;
+}
+
+.chat-calendar-action .icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.chat-calendar-notice {
+  width: min(100%, 64rem);
+  margin: 0 auto 0.9rem;
+  justify-content: space-between;
+}
+
+.chat-calendar-notice > span,
+.chat-calendar-notice-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.chat-calendar-notice > span {
+  min-width: 0;
+}
+
+.chat-calendar-notice-actions {
+  flex: 0 0 auto;
+}
+
+.chat-calendar-notice a {
+  color: var(--primary);
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
 .message.user .bubble-footer {
   color: color-mix(in oklab, var(--primary-foreground), transparent 30%);
 }
@@ -2977,6 +3043,24 @@ body,
 
   .bubble {
     max-width: 82%;
+  }
+
+  .chat-calendar-actions {
+    flex-direction: column;
+  }
+
+  .chat-calendar-action {
+    width: 100%;
+  }
+
+  .chat-calendar-notice {
+    width: calc(100% - 2rem);
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .chat-calendar-notice-actions {
+    justify-content: space-between;
   }
 }
 
