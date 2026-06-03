@@ -6,6 +6,7 @@
     "dev": "node serve-static.mjs",
     "build": "node build-static.mjs",
     "preview": "node serve-static.mjs dist 4173",
-    "lint": "node --check app.js"
+    "lint": "node --check app.js",
+    "test": "node --test tests/*.test.mjs"
   }
 }

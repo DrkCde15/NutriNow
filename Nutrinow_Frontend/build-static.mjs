@@ -28,6 +28,7 @@ function minifyCss(css) {
 await writeFile(join(dist, "index.html"), minifyHtml(await readFile(join(root, "index.html"), "utf8")));
 await writeFile(join(dist, "styles.css"), minifyCss(await readFile(join(root, "styles.css"), "utf8")));
 await cp(join(root, "app.js"), join(dist, "app.js"));
+await cp(join(root, "modules"), join(dist, "modules"), { recursive: true });
 await cp(join(root, "assets"), join(dist, "assets"), { recursive: true });
 
 console.log("Static build created in dist/");

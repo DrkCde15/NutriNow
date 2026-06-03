@@ -65,7 +65,7 @@ O projeto combina uma SPA estatica no frontend com uma API Flask no backend. A a
 - Fallback entre modelos Groq configuraveis por variavel de ambiente.
 - Retry com backoff para erros transitorios de rede, cota ou indisponibilidade.
 - Renderizacao de Markdown basico no frontend, incluindo listas, tabelas e enfases.
-- Upload de imagem no chat. No modo Groq atual, o endpoint aceita imagens, mas o agente responde que a analise visual ainda nao esta habilitada.
+- Upload de imagem no chat com analise visual real quando `GROQ_VISION_MODEL` aponta para um modelo multimodal compativel.
 
 ### Feedbacks
 
@@ -88,6 +88,8 @@ O projeto combina uma SPA estatica no frontend com uma API Flask no backend. A a
 - Cache local para usuario autenticado, sessoes de chat e sessao atual.
 - Comunicacao com a API via `fetch`, incluindo envio automatico de JWT, refresh de sessao e tratamento centralizado de erros.
 - Upload de arquivos com `FormData` para o endpoint de analise de imagem.
+- Paginas de termos de uso, privacidade e LGPD com rotas publicas.
+- Analytics proprio com consentimento explicito e eventos minimizados.
 - Build proprio em `build-static.mjs`, com minificacao simples de HTML/CSS e copia de assets para `dist/`.
 - Servidor local proprio em `serve-static.mjs`, com fallback de SPA e headers de cache por tipo de arquivo.
 
@@ -106,6 +108,8 @@ O projeto combina uma SPA estatica no frontend com uma API Flask no backend. A a
 - CORS configuravel por ambiente, com origens locais e de producao.
 - Cookies de refresh token com suporte a CSRF.
 - Headers de seguranca, incluindo `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`, CSP e HSTS em producao.
+- Validacao obrigatoria de configuracao de producao para segredos, HTTPS, cookies seguros e integracoes.
+- Endpoint `/health/ready` para checar prontidao do banco em deploy.
 - Limite de upload configuravel por `MAX_UPLOAD_MB`.
 - Cache TTL em memoria para sessoes de chat, itens de rotina e dados de conta.
 - Servimento opcional do frontend estatico gerado em `Nutrinow_Frontend/dist/`.
@@ -140,6 +144,7 @@ O projeto combina uma SPA estatica no frontend com uma API Flask no backend. A a
 - Validacao de extensao, MIME type e assinatura dos arquivos de imagem enviados.
 - Bloqueio de CORS wildcard (`*`) para evitar configuracao insegura.
 - Segredos obrigatorios e com tamanho minimo em producao.
+- Analytics first-party somente apos consentimento; metadados sensiveis sao filtrados no cliente e no servidor.
 
 ## Estrutura
 
@@ -216,8 +221,9 @@ MYSQL_POOL_SIZE=2
 
 GROQ_API_KEY=sua_chave_groq
 GROQ_BASE_URL=https://api.groq.com/openai/v1
-GROQ_PRIMARY_MODEL=seu_modelo_principal
-GROQ_FALLBACK_MODELS=seu_modelo_fallback
+GROQ_PRIMARY_MODEL=groq/compound-mini
+GROQ_FALLBACK_MODELS=groq/compound
+GROQ_VISION_MODEL=seu_modelo_multimodal_para_imagens
 GROQ_TIMEOUT_SECONDS=60
 GROQ_MAX_RETRIES=5
 GROQ_TEMPERATURE=0.7
@@ -233,11 +239,12 @@ EMAIL_SENDER=seu_email@gmail.com
 EMAIL_PASSWORD=sua_senha_de_app
 
 MAX_UPLOAD_MB=5
+VISION_IMAGE_MAX_MB=5
 UPLOAD_FOLDER=uploads
 CHAT_MESSAGE_MAX_CHARS=8000
 ```
 
-Em producao, use `APP_ENV=production`, configure `FRONTEND_URL_PROD`/`CORS_ORIGINS_PROD`, ative cookies seguros e use segredos com pelo menos 32 caracteres.
+Em producao, use `APP_ENV=production`, configure `FRONTEND_URL_PROD`/`CORS_ORIGINS_PROD` com HTTPS, ative `JWT_COOKIE_SECURE=true`, configure `GROQ_VISION_MODEL` com um modelo multimodal para analise real de imagens e use segredos com pelo menos 32 caracteres. `groq/compound-mini` e `groq/compound` ficam recomendados para texto/fallback. A aplicacao falha no boot se a validacao de producao encontrar configuracao insegura ou incompleta.
 
 ## Como rodar localmente
 
@@ -253,6 +260,25 @@ python App.py
 ```
 
 API local: `http://127.0.0.1:8000`
+
+## Testes e verificacoes
+
+Frontend:
+
+```powershell
+cd Nutrinow_Frontend
+npm run lint
+npm test
+npm run build
+```
+
+Backend:
+
+```powershell
+cd NutriNow_BackEnd
+python -m unittest discover tests
+python -m compileall .
+```
 
 ## Deploy no Render em um unico Web Service
 

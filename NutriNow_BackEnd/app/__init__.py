@@ -13,7 +13,10 @@ from app.routes.profile import profile_bp
 from app.routes.fitness import fitness_bp
 from app.routes.feedbacks import feedback_bp
 from app.routes.calendar import google_calendar_bp
+from app.routes.analytics import analytics_bp
+from app.database import get_db
 from app.security import build_allowed_origins, env_flag, is_development
+from app.services.production_checks import validate_production_environment
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +37,7 @@ def _secret_or_dev_fallback(name, fallback=None):
 
 def create_app():
     load_dotenv()
+    validate_production_environment()
     app = Flask(__name__)
 
     if env_flag("TRUST_PROXY_HEADERS", not is_development()):
@@ -87,10 +91,22 @@ def create_app():
     app.register_blueprint(fitness_bp)
     app.register_blueprint(feedback_bp)
     app.register_blueprint(google_calendar_bp)
+    app.register_blueprint(analytics_bp)
 
     @app.route("/health", methods=["GET"])
     def health():
         return jsonify({"status": "ok"})
+
+    @app.route("/health/ready", methods=["GET"])
+    def ready():
+        try:
+            with get_db() as (cursor, conn):
+                cursor.execute("SELECT 1 AS ok")
+                cursor.fetchone()
+            return jsonify({"status": "ok", "checks": {"database": "ok"}})
+        except Exception as exc:
+            logger.error("Readiness check falhou: %s", exc)
+            return jsonify({"status": "error", "checks": {"database": "error"}}), 503
 
     frontend_dist = os.path.abspath(
         os.path.join(os.path.dirname(__file__), "..", "..", "Nutrinow_Frontend", "dist")

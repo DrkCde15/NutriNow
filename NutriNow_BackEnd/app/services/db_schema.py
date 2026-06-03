@@ -133,6 +133,22 @@ CORE_SCHEMA_SQL = [
             FOREIGN KEY (dieta_treino_id) REFERENCES dieta_treino(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     """,
+    """
+    CREATE TABLE IF NOT EXISTS analytics_events (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NULL,
+        anonymous_id VARCHAR(120) NULL,
+        event_type VARCHAR(40) NOT NULL,
+        path VARCHAR(255) NULL,
+        metadata JSON NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_analytics_created (created_at),
+        INDEX idx_analytics_event_created (event_type, created_at),
+        INDEX idx_analytics_user_created (user_id, created_at),
+        CONSTRAINT fk_analytics_user
+            FOREIGN KEY (user_id) REFERENCES usuarios(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """,
 ]
 
 def ensure_core_schema(cursor):

@@ -1,3 +1,5 @@
+import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
+
 (function () {
   "use strict";
 
@@ -51,6 +53,14 @@
     chatSessions: { loaded: false, loading: false, items: null, error: "" },
     chatHistory: {},
   };
+
+  const analytics = new AnalyticsClient({
+    storage: window.localStorage,
+    endpoint: () => `${getApiBase()}/analytics/events`,
+    getToken,
+    getUserId: () => getUser()?.id || null,
+    fetchImpl: window.fetch.bind(window),
+  });
 
   const BMI_CATEGORIES = [
     { min: 0, max: 18.49, label: "Abaixo do peso", range: "< 18.5", color: "#60a5fa" },
@@ -455,6 +465,9 @@
       "/chat",
       "/perfil",
       "/feedbacks",
+      "/termos",
+      "/privacidade",
+      "/lgpd",
     ]);
     return valid.has(path) ? path : "/";
   }
@@ -544,6 +557,9 @@
             <span>NutriNow</span>
           </a>
           <div class="footer-side">
+            <a href="/termos" data-link>Termos</a>
+            <a href="/privacidade" data-link>Privacidade</a>
+            <a href="/lgpd" data-link>LGPD</a>
             <a href="/feedbacks" data-link class="icon-btn" aria-label="Abrir página de feedbacks" title="Feedbacks">
               ${icon("message", "icon-lg")}
             </a>
@@ -2479,6 +2495,63 @@
     );
   }
 
+  function legalPage(key) {
+    const page = LEGAL_PAGES[key] || LEGAL_PAGES.termos;
+    return pageShell(
+      `
+      <main class="page-main legal-page">
+        <div class="container">
+          <section class="legal-hero">
+            <span class="badge">${icon("checkCircle")} ${escapeHtml(page.eyebrow)}</span>
+            <h1>${escapeHtml(page.title)}</h1>
+            <p>${escapeHtml(page.summary)}</p>
+            <small>Atualizado em ${escapeHtml(page.updatedAt)}. Modelo inicial: revise com assessoria jurídica antes de uso comercial.</small>
+          </section>
+          <section class="legal-grid" aria-label="${escapeHtml(page.title)}">
+            ${page.sections
+              .map(
+                (section) => `
+                  <article class="legal-section">
+                    <h2>${escapeHtml(section.title)}</h2>
+                    <p>${escapeHtml(section.body)}</p>
+                  </article>
+                `,
+              )
+              .join("")}
+          </section>
+          <section class="compliance-note">
+            <h2>Próximo passo obrigatório</h2>
+            <p>Configure o controlador, o canal do encarregado, política de retenção e registros de consentimento antes de vender ou operar o NutriNow com usuários reais.</p>
+            <div class="inline-actions">
+              <a href="/privacidade" data-link class="btn btn-secondary">Ver privacidade</a>
+              <a href="/lgpd" data-link class="btn btn-primary">Ver LGPD</a>
+            </div>
+          </section>
+        </div>
+      </main>
+      ${footerMarkup()}
+      `,
+      page.route,
+    );
+  }
+
+  function analyticsConsentMarkup() {
+    if (!analytics.needsConsent()) return "";
+    return `
+      <aside class="consent-banner" role="dialog" aria-live="polite" aria-label="Preferência de analytics">
+        <div>
+          <strong>Analytics com privacidade</strong>
+          <p>Usamos métricas próprias e minimizadas para entender navegação. Não coletamos mensagens, fotos, senha ou dados sensíveis do perfil.</p>
+          <a href="/privacidade" data-link>Como seus dados são usados</a>
+        </div>
+        <div class="consent-actions">
+          <button class="btn btn-secondary" data-action="analytics-decline">Recusar</button>
+          <button class="btn btn-primary" data-action="analytics-accept">Permitir</button>
+        </div>
+      </aside>
+    `;
+  }
+
   function render() {
     const path = normalizePath(getCurrentPath());
     state.recoverySent = path === "/esqueci-senha" ? state.recoverySent : false;
@@ -2495,6 +2568,9 @@
       "/chat": "Chat NutriAI - NutriNow",
       "/perfil": "Meu perfil - NutriNow",
       "/feedbacks": "Feedbacks - NutriNow",
+      "/termos": "Termos de Uso - NutriNow",
+      "/privacidade": "Política de Privacidade - NutriNow",
+      "/lgpd": "LGPD - NutriNow",
     };
     document.title = titles[path] || titles["/"];
     const pages = {
@@ -2509,11 +2585,15 @@
       "/chat": chatPage,
       "/perfil": perfilPage,
       "/feedbacks": feedbacksPage,
+      "/termos": () => legalPage("termos"),
+      "/privacidade": () => legalPage("privacidade"),
+      "/lgpd": () => legalPage("lgpd"),
     };
-    app.innerHTML = pages[path]();
+    app.innerHTML = `${pages[path]()}${analyticsConsentMarkup()}`;
     ensureAutocompleteAttributes(app);
     bindPage();
     handleBackendRedirectParams(path);
+    analytics.trackPageView(path, document.title);
     scheduleRouteLoads(path);
     requestAnimationFrame(() => {
       app.querySelectorAll("[data-bmi]").forEach((root) => updateBmi(root));
@@ -2646,7 +2726,25 @@
     bindChat();
     bindProfile();
     bindFeedback();
+    bindAnalyticsConsent();
     bindModalClose();
+  }
+
+  function bindAnalyticsConsent() {
+    app.querySelectorAll('[data-action="analytics-accept"]').forEach((button) => {
+      button.addEventListener("click", () => {
+        analytics.setConsent("accepted");
+        analytics.trackPageView(normalizePath(getCurrentPath()), document.title);
+        render();
+      });
+    });
+
+    app.querySelectorAll('[data-action="analytics-decline"]').forEach((button) => {
+      button.addEventListener("click", () => {
+        analytics.setConsent("declined");
+        render();
+      });
+    });
   }
 
   function setFormError(form, message) {

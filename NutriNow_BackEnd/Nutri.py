@@ -1,4 +1,5 @@
 # Nutri.py - Nutritionist Agent using Groq API
+import base64
 import os
 import logging
 import random
@@ -68,13 +69,14 @@ class NutritionistAgent:
 
         # Groq only
         self.groq_api_key = os.getenv("GROQ_API_KEY")
-        self.groq_base_url = os.getenv("GROQ_BASE_URL").rstrip("/")
+        self.groq_base_url = (os.getenv("GROQ_BASE_URL") or "https://api.groq.com/openai/v1").rstrip("/")
         self.groq_timeout_seconds = self._resolve_groq_timeout_seconds()
-        self.max_retries = int(os.getenv("GROQ_MAX_RETRIES"))
-        self.temperature = float(os.getenv("GROQ_TEMPERATURE"))
+        self.max_retries = int(os.getenv("GROQ_MAX_RETRIES", "3"))
+        self.temperature = float(os.getenv("GROQ_TEMPERATURE", "0.7"))
 
         self.model_name = os.getenv("GROQ_PRIMARY_MODEL")
-        fallback_models_raw = os.getenv("GROQ_FALLBACK_MODELS")
+        self.vision_model_name = os.getenv("GROQ_VISION_MODEL") or os.getenv("VISION_MODEL")
+        fallback_models_raw = os.getenv("GROQ_FALLBACK_MODELS") or ""
         self.fallback_models = [m.strip() for m in fallback_models_raw.split(",") if m.strip()]
 
         if not self.groq_api_key:
@@ -111,7 +113,7 @@ class NutritionistAgent:
         )
         return any(marker in msg for marker in retryable_markers)
 
-    def _call_groq_chat_completion(self, messages: List[Dict[str, str]], model: str) -> str:
+    def _call_groq_chat_completion(self, messages: List[Dict], model: str) -> str:
         if not self.groq_api_key:
             raise RuntimeError("GROQ_API_KEY nao configurada")
 
@@ -147,9 +149,10 @@ class NutritionistAgent:
             .strip()
         )
 
-    def _generate_with_retry(self, messages: List[Dict[str, str]]) -> str:
+    def _generate_with_retry(self, messages: List[Dict], models: Optional[List[str]] = None) -> str:
         candidate_models: List[str] = []
-        for model in [self.model_name] + self.fallback_models:
+        model_list = models if models is not None else [self.model_name] + self.fallback_models
+        for model in model_list:
             if model and model not in candidate_models:
                 candidate_models.append(model)
 
@@ -181,6 +184,29 @@ class NutritionistAgent:
             logger.warning(f"Falha ao usar o modelo {model}. Tentando fallback, se disponivel.")
 
         raise last_exc if last_exc else RuntimeError("Falha ao gerar conteudo no Groq.")
+
+    @staticmethod
+    def _detect_image_mime(header: bytes) -> str:
+        if header.startswith(b"\xff\xd8\xff"):
+            return "image/jpeg"
+        if header.startswith(b"\x89PNG\r\n\x1a\n"):
+            return "image/png"
+        if header.startswith(b"RIFF") and len(header) >= 12 and header[8:12] == b"WEBP":
+            return "image/webp"
+        raise ValueError("Formato de imagem nao suportado para analise visual")
+
+    @classmethod
+    def _image_to_data_url(cls, file_path: str) -> str:
+        max_bytes = int(os.getenv("VISION_IMAGE_MAX_MB", os.getenv("MAX_UPLOAD_MB", "5"))) * 1024 * 1024
+        with open(file_path, "rb") as file:
+            payload = file.read(max_bytes + 1)
+
+        if len(payload) > max_bytes:
+            raise ValueError("Imagem excede o limite configurado para analise visual")
+
+        mime = cls._detect_image_mime(payload[:32])
+        encoded = base64.b64encode(payload).decode("ascii")
+        return f"data:{mime};base64,{encoded}"
 
     def _get_db_connection(self):
         if self._uses_default_db:
@@ -487,5 +513,39 @@ class NutritionistAgent:
             return "Puxa, tive um probleminha tecnico aqui. Pode repetir?"
 
     def run_image(self, file_path: str) -> str:
-        """No modo Groq atual, a analise de imagem nao esta habilitada neste agente."""
-        return "No momento, este agente esta configurado para Groq em modo texto. A analise de imagem nao esta habilitada."
+        """Analisa uma imagem usando um modelo multimodal compativel com Chat Completions."""
+        if not self.vision_model_name:
+            return (
+                "A analise visual esta disponivel no codigo, mas falta configurar GROQ_VISION_MODEL "
+                "com um modelo multimodal compativel."
+            )
+
+        try:
+            user_context = self._get_user_context()
+            calendar_context = self._get_calendar_context()
+            data_url = self._image_to_data_url(file_path)
+            prompt = (
+                "Analise a imagem enviada pelo usuario no contexto de nutricao. "
+                "Se parecer uma refeicao, estime alimentos provaveis, porcoes, calorias e macros de forma cautelosa. "
+                "Se a imagem nao for de alimento, diga isso claramente. "
+                "Inclua alertas de incerteza e sugestoes praticas para melhorar a refeicao."
+            )
+            messages: List[Dict] = [
+                {"role": "system", "content": f"{SYSTEM_PROMPT}{user_context}{calendar_context}"},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": data_url}},
+                    ],
+                },
+            ]
+            return self._generate_with_retry(messages, models=[self.vision_model_name])
+        except Exception as e:
+            logger.error(f"Erro na analise visual NutriAgent: {e}")
+            msg = str(e).lower()
+            if "429" in msg:
+                return "A analise visual esta com limite de cota excedido. Aguarde alguns segundos e tente novamente."
+            if "vision" in msg or "image" in msg or "400" in msg:
+                return "Nao consegui analisar essa imagem com o modelo visual configurado. Verifique GROQ_VISION_MODEL e tente novamente."
+            return "Tive um problema tecnico ao analisar a imagem. Pode tentar novamente?"
