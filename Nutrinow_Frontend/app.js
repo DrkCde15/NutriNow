@@ -418,10 +418,6 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     return PREMIUM_ROUTES.has(normalizePath(path));
   }
 
-  function defaultAuthenticatedPath(user = getUser()) {
-    return isPremiumUser(user) ? "/dashboard" : "/chat";
-  }
-
   function premiumLabel(user = getUser()) {
     return isPremiumUser(user) ? "Premium" : "Free";
   }
@@ -498,6 +494,13 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     state.planModal = null;
     state.calendarModal = null;
     state.chatSidebarOpen = false;
+    if (path === "/" && location.protocol.startsWith("http")) {
+      const updateHistory = replace ? history.replaceState.bind(history) : history.pushState.bind(history);
+      updateHistory({}, "", "/");
+      render();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
     const nextHash = `#${path}`;
     if (replace && location.protocol.startsWith("http")) {
       history.replaceState({}, "", `${location.pathname}${location.search}${nextHash}`);
@@ -2731,14 +2734,9 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
   function render() {
     const path = normalizePath(getCurrentPath());
     const user = getUser();
-    const hasPendingAuthCode = location.protocol.startsWith("http") && new URLSearchParams(location.search).has("auth_code");
     if (user && isPremiumRoute(path) && !isPremiumUser(user)) {
       state.premiumModal = { path };
       routeTo("/chat", true);
-      return;
-    }
-    if (user && path === "/" && !hasPendingAuthCode) {
-      routeTo(defaultAuthenticatedPath(user), true);
       return;
     }
     state.recoverySent = path === "/esqueci-senha" ? state.recoverySent : false;
@@ -2822,7 +2820,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
           saveSessionPayload(payload);
           state.authExchanging = false;
           cleanQueryParams(["auth_code"]);
-          routeTo(defaultAuthenticatedPath(payload.user || getUser()), true);
+          routeTo("/", true);
         })
         .catch((error) => {
           state.authExchanging = false;
@@ -3066,7 +3064,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
             token: "",
           });
           saveSessionPayload(payload);
-          routeTo(defaultAuthenticatedPath(payload.user || getUser()));
+          routeTo("/");
         } catch (error) {
           setFormError(login, getErrorMessage(error, "Erro ao entrar"));
           button.disabled = false;
@@ -3117,7 +3115,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
             });
             saveSessionPayload(payload);
           }
-          routeTo(defaultAuthenticatedPath(getUser()));
+          routeTo("/");
         } catch (error) {
           setFormError(cadastro, getErrorMessage(error, "Erro ao cadastrar"));
           button.disabled = false;
