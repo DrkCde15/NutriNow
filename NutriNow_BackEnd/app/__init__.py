@@ -141,10 +141,12 @@ def create_app():
         requested_path = os.path.abspath(os.path.join(frontend_dist, path))
 
         if path and requested_path.startswith(frontend_dist) and os.path.isfile(requested_path):
-            cache_seconds = 31536000 if path.startswith("assets/") else 3600
+            cache_seconds = 31536000 if path.startswith("assets/") else 0
             response = send_from_directory(frontend_dist, path, max_age=cache_seconds)
             if path.startswith("assets/"):
                 response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            else:
+                response.headers["Cache-Control"] = "no-cache, max-age=0"
             return response
 
         if os.path.isfile(index_path):
