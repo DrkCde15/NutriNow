@@ -483,8 +483,9 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
   }
 
   function getCurrentPath() {
-    if (location.hash.startsWith("#/")) return location.hash.slice(1);
-    if (location.protocol === "file:") return "/";
+    if (location.protocol === "file:") {
+      return location.hash.startsWith("#/") ? location.hash.slice(1) : "/";
+    }
     let path = location.pathname || "/";
     if (path.endsWith("/index.html")) path = "/";
     return path || "/";
