@@ -74,7 +74,27 @@ def create_app():
         CHAT_MESSAGE_MAX_CHARS=chat_message_max_chars,
     )
 
-    JWTManager(app)
+    jwt = JWTManager(app)
+
+    @jwt.invalid_token_loader
+    def invalid_token(reason):
+        return jsonify({"error": "Sessao invalida", "code": "invalid_token", "detail": reason}), 401
+
+    @jwt.unauthorized_loader
+    def unauthorized_token(reason):
+        return jsonify({"error": "Sessao ausente", "code": "authorization_required", "detail": reason}), 401
+
+    @jwt.expired_token_loader
+    def expired_token(_jwt_header, _jwt_payload):
+        return jsonify({"error": "Sessao expirada", "code": "token_expired"}), 401
+
+    @jwt.revoked_token_loader
+    def revoked_token(_jwt_header, _jwt_payload):
+        return jsonify({"error": "Sessao revogada", "code": "token_revoked"}), 401
+
+    @jwt.needs_fresh_token_loader
+    def needs_fresh_token(_jwt_header, _jwt_payload):
+        return jsonify({"error": "Sessao precisa ser renovada", "code": "fresh_token_required"}), 401
 
     allowed_origins = build_allowed_origins()
 

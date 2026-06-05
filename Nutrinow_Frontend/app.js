@@ -221,13 +221,30 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
   }
 
   function getToken() {
-    return localStorage.getItem(STORAGE.token) || "";
+    const token = localStorage.getItem(STORAGE.token) || "";
+    if (token && !isLikelyJwt(token)) {
+      localStorage.removeItem(STORAGE.token);
+      sessionStorage.removeItem(STORAGE.token);
+      return "";
+    }
+    return token;
   }
 
   function setToken(token) {
     if (token) localStorage.setItem(STORAGE.token, token);
     else localStorage.removeItem(STORAGE.token);
     sessionStorage.removeItem(STORAGE.token);
+  }
+
+  function isLikelyJwt(token) {
+    const parts = String(token || "").split(".");
+    return parts.length === 3 && parts.every(Boolean);
+  }
+
+  function clearLocalSession() {
+    setToken("");
+    setUser(null);
+    clearRemoteCaches();
   }
 
   function clearRemoteCaches() {
@@ -302,8 +319,16 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     return refreshSessionPromise;
   }
 
-  function shouldRefreshAuth(path, response, options) {
-    if (options.skipAuthRefresh || response.status !== 401) return false;
+  function isJwtAuthError(response, data) {
+    return response.status === 422 && typeof data === "object" && data && typeof data.msg === "string";
+  }
+
+  function isAuthFailureResponse(response, data) {
+    return response.status === 401 || isJwtAuthError(response, data);
+  }
+
+  function shouldRefreshAuth(path, response, data, options) {
+    if (options.skipAuthRefresh || !isAuthFailureResponse(response, data)) return false;
     if (["/refresh", "/login", "/cadastro", "/auth/exchange-code"].includes(path)) return false;
     return Boolean(getRefreshCsrfToken());
   }
@@ -343,20 +368,25 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
   async function apiRequest(path, options = {}) {
     const result = await performApiRequest(path, options);
 
-    if (!result.response.ok && shouldRefreshAuth(path, result.response, options)) {
+    if (!result.response.ok && shouldRefreshAuth(path, result.response, result.data, options)) {
       try {
         await refreshSession();
         const retry = await performApiRequest(path, options, getToken());
         if (retry.response.ok) return retry.data;
         throw buildApiError(retry.response, retry.data);
       } catch (error) {
-        setToken("");
-        setUser(null);
+        clearLocalSession();
         throw error;
       }
     }
 
-    if (!result.response.ok) throw buildApiError(result.response, result.data);
+    if (!result.response.ok) {
+      const error = buildApiError(result.response, result.data);
+      if (isAuthFailureResponse(result.response, result.data)) {
+        clearLocalSession();
+      }
+      throw error;
+    }
     return result.data;
   }
 
@@ -372,9 +402,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     } catch {
       // A sessao local ainda deve ser encerrada se o backend estiver indisponivel.
     }
-    setToken("");
-    setUser(null);
-    clearRemoteCaches();
+    clearLocalSession();
   }
 
   function getUser() {
