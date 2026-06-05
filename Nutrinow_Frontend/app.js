@@ -44,6 +44,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     feedbackSubmitted: false,
     recoverySent: false,
     resetDone: false,
+    paymentReturn: { checking: false, checked: false, error: "" },
     profileSaved: false,
     premiumModal: null,
     authExchanging: false,
@@ -491,6 +492,8 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
       "/cadastro",
       "/esqueci-senha",
       "/reset-senha",
+      "/pagamento-aprovado",
+      "/pagamento-sucesso",
       "/dashboard",
       "/planos",
       "/calendario",
@@ -620,6 +623,8 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
   function premiumUpgradeModalMarkup() {
     if (!state.premiumModal) return "";
     const path = normalizePath(state.premiumModal.path || "");
+    const loading = Boolean(state.premiumModal.loading);
+    const error = state.premiumModal.error || "";
     const titleByPath = {
       "/dashboard": "Dashboard premium",
       "/planos": "Planos premium",
@@ -635,8 +640,9 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
               <p class="text-muted" style="margin-top:.45rem;line-height:1.55;">Esse recurso faz parte do plano premium. Sua conta free continua com acesso ao Chat NutriAI, perfil, login, cadastro, feedbacks e paginas legais.</p>
             </div>
           </div>
+          ${error ? `<div class="alert premium-modal-error">${icon("alert")} ${escapeHtml(error)}</div>` : ""}
           <div class="premium-modal-actions">
-            <button type="button" class="btn btn-primary" data-action="pay-premium">${icon("sparkles")} Pagar</button>
+            <button type="button" class="btn btn-primary" data-action="pay-premium" ${loading ? "disabled" : ""}>${icon("sparkles")} ${loading ? "Abrindo..." : "Pagar"}</button>
             <button type="button" class="btn btn-secondary" data-action="close-premium-modal">${icon("x")} Fechar</button>
           </div>
         </section>
@@ -779,6 +785,75 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
         </div>
       </section>
     `;
+  }
+
+  function pagamentoAprovadoPage() {
+    const user = getUser();
+    const premium = isPremiumUser(user);
+    const checking = state.paymentReturn.checking;
+    const checked = state.paymentReturn.checked;
+    const statusMarkup = !user
+      ? `<div class="alert payment-status">${icon("alert")} Entre com a mesma conta usada no checkout para liberar o Premium.</div>`
+      : premium
+        ? `<div class="success-box payment-status">${icon("checkCircle")} Premium ativo. Sua conta ja esta liberada.</div>`
+        : `<div class="success-box payment-status">${icon("clock")} Pagamento recebido. Se o acesso ainda nao apareceu, aguarde alguns segundos e atualize o status.</div>`;
+    const secondaryStatus = checked && !premium && !state.paymentReturn.error
+      ? `<p class="text-muted payment-hint">A Cakto pode levar alguns instantes para enviar o webhook de confirmacao.</p>`
+      : "";
+    return pageShell(
+      `
+      <main>
+        <section class="payment-success-hero">
+          <div class="container payment-success-layout">
+            <div class="payment-success-copy animate-fade-up">
+              <span class="badge">${icon("checkCircle")} Pagamento aprovado</span>
+              <h1>${premium ? "Premium ativado" : "Seu Premium esta sendo ativado"}</h1>
+              <p>Obrigado por assinar o NutriNow. Agora voce pode acessar dashboard, dietas, treinos e calendario integrado assim que a confirmacao do pagamento chegar.</p>
+              ${statusMarkup}
+              ${state.paymentReturn.error ? `<div class="alert payment-status">${icon("alert")} ${escapeHtml(state.paymentReturn.error)}</div>` : ""}
+              ${secondaryStatus}
+              <div class="inline-actions payment-success-actions">
+                ${
+                  premium
+                    ? `<a href="/dashboard" data-link class="btn btn-primary">${icon("layout")} Acessar dashboard</a>`
+                    : user
+                      ? `<button type="button" class="btn btn-primary" data-action="refresh-payment-status" ${checking ? "disabled" : ""}>${icon("refresh")} ${checking ? "Atualizando..." : "Atualizar status"}</button>`
+                      : `<a href="/login" data-link class="btn btn-primary">${icon("login")} Entrar</a>`
+                }
+                <a href="/chat" data-link class="btn btn-secondary">${icon("message")} Abrir Chat NutriAI</a>
+              </div>
+            </div>
+            <div class="payment-success-media animate-fade-up delay-200">
+              <img src="${ASSETS.hero}" alt="Refeicao saudavel com frutas e ingredientes naturais" width="1280" height="960" decoding="async">
+            </div>
+          </div>
+        </section>
+        <section class="section surface">
+          <div class="container">
+            <div class="steps-grid">
+              <article class="step-card">
+                <span class="step-number text-gradient">01</span>
+                <h3>Pagamento confirmado</h3>
+                <p>A Cakto envia o webhook de aprovacao para o NutriNow.</p>
+              </article>
+              <article class="step-card">
+                <span class="step-number text-gradient">02</span>
+                <h3>Conta liberada</h3>
+                <p>O backend valida o pedido na Cakto e marca sua conta como Premium.</p>
+              </article>
+              <article class="step-card">
+                <span class="step-number text-gradient">03</span>
+                <h3>Rotina premium</h3>
+                <p>Voce acessa planos, dashboard e calendario para organizar seu progresso.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+      </main>
+      ${footerMarkup()}
+      `,
+      "/pagamento-aprovado",
+    );
   }
 
   function getBmiCategory(bmi) {
@@ -2646,6 +2721,8 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
       "/cadastro": "Criar conta - NutriNow",
       "/esqueci-senha": "Recuperar senha - NutriNow",
       "/reset-senha": "Redefinir senha - NutriNow",
+      "/pagamento-aprovado": "Pagamento aprovado - NutriNow",
+      "/pagamento-sucesso": "Pagamento aprovado - NutriNow",
       "/dashboard": "Dashboard - NutriNow",
       "/planos": "Meus planos - NutriNow",
       "/calendario": "Calendário - NutriNow",
@@ -2663,6 +2740,8 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
       "/cadastro": cadastroPage,
       "/esqueci-senha": esqueciSenhaPage,
       "/reset-senha": resetSenhaPage,
+      "/pagamento-aprovado": pagamentoAprovadoPage,
+      "/pagamento-sucesso": pagamentoAprovadoPage,
       "/dashboard": dashboardPage,
       "/planos": planosPage,
       "/calendario": calendarioPage,
@@ -2825,9 +2904,26 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     bindChat();
     bindProfile();
     bindFeedback();
+    bindPaymentReturn();
     bindAnalyticsConsent();
     bindPremiumModal();
     bindModalClose();
+  }
+
+  function bindPaymentReturn() {
+    app.querySelectorAll('[data-action="refresh-payment-status"]').forEach((button) => {
+      button.addEventListener("click", async () => {
+        state.paymentReturn = { checking: true, checked: state.paymentReturn.checked, error: "" };
+        render();
+        const user = await syncAccountSnapshot({ renderAfter: false });
+        state.paymentReturn = {
+          checking: false,
+          checked: true,
+          error: user ? "" : "Nao foi possivel atualizar sua conta agora.",
+        };
+        render();
+      });
+    });
   }
 
   function bindAnalyticsConsent() {
@@ -2856,9 +2952,35 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     });
 
     app.querySelectorAll('[data-action="pay-premium"]').forEach((button) => {
-      button.addEventListener("click", () => {
+      button.addEventListener("click", async () => {
         const paymentUrl = getPaymentUrl();
-        if (paymentUrl) window.location.href = paymentUrl;
+        button.disabled = true;
+        state.premiumModal = { ...(state.premiumModal || {}), loading: true, error: "" };
+        render();
+        try {
+          const result = await apiRequest("/billing/checkout", { method: "POST" });
+          const checkoutUrl = String(result?.checkout_url || result?.checkoutUrl || "").trim();
+          if (checkoutUrl) {
+            window.location.href = checkoutUrl;
+            return;
+          }
+          if (paymentUrl) {
+            window.location.href = paymentUrl;
+            return;
+          }
+          throw new Error("Checkout indisponivel no momento.");
+        } catch (error) {
+          if (paymentUrl) {
+            window.location.href = paymentUrl;
+            return;
+          }
+          state.premiumModal = {
+            ...(state.premiumModal || {}),
+            loading: false,
+            error: getErrorMessage(error, "Nao foi possivel iniciar pagamento"),
+          };
+          render();
+        }
       });
     });
   }
@@ -3704,7 +3826,23 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
       });
   }
 
+  async function syncAccountSnapshot(options = {}) {
+    const { renderAfter = true } = options;
+    if (!getToken()) return null;
+    try {
+      const user = await apiRequest("/me");
+      if (!user?.id) return null;
+      setUser(user);
+      if (renderAfter) render();
+      return user;
+    } catch {
+      // Mantem a sessao local se o backend estiver temporariamente indisponivel.
+      return null;
+    }
+  }
+
   migratePersistentSession();
   render();
   bootstrapPersistentSession();
+  syncAccountSnapshot();
 })();

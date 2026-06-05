@@ -28,6 +28,9 @@ O projeto combina uma SPA estatica no frontend com uma API Flask no backend. A a
 - Contas free podem acessar Login, Cadastro, Perfil, Chat NutriAI, Feedbacks, Termos de Uso, Privacidade e LGPD.
 - Dashboard, dietas/treinos e Google Calendar exigem conta premium.
 - Ao clicar em atalhos premium com conta free, o frontend exibe um modal com as opcoes Pagar e Fechar.
+- O botao Pagar chama `/billing/checkout`, que gera o link da Cakto com `refId=nutrinow_user_<id>`.
+- O webhook `/billing/webhook/cakto` ativa premium somente apos validar o pedido como pago na API da Cakto.
+- A pagina de retorno para pagamento aprovado fica em `/pagamento-aprovado`, com alias `/pagamento-sucesso`.
 - O backend bloqueia APIs premium com `402` e codigo `premium_required`.
 - O estado premium fica em `usuarios.is_premium`, com expiracao opcional em `usuarios.premium_expires_at`.
 
@@ -139,6 +142,7 @@ O projeto combina uma SPA estatica no frontend com uma API Flask no backend. A a
 
 - Google OAuth para login social.
 - Google Calendar API para criar, atualizar e excluir eventos de rotina.
+- Cakto para checkout premium e webhook de confirmacao de pagamento.
 - SMTP para recuperacao de senha e notificacao de feedbacks.
 - Groq API para respostas da NutriAI.
 - `python-dotenv` para carregar variaveis de ambiente em desenvolvimento.
@@ -244,6 +248,14 @@ GOOGLE_CALENDAR_REDIRECT_URI=http://127.0.0.1:8000/calendar/google/callback
 GOOGLE_CALENDAR_TIMEZONE=America/Sao_Paulo
 GOOGLE_CALENDAR_EVENT_DURATION_MINUTES=60
 
+CAKTO_CLIENT_ID=seu_cakto_client_id
+CAKTO_CLIENT_SECRET=seu_cakto_client_secret
+CAKTO_API_KEY=sua_cakto_api_key
+BASE_URL_CAKTO=https://api.cakto.com.br/
+CHECKOUT_LINK=https://pay.cakto.com.br/seu_checkout
+CAKTO_WEBHOOK_SECRET=um_segredo_para_validar_webhook
+WEBHOOK_KEY=um_segredo_para_validar_webhook
+
 EMAIL_SENDER=seu_email@gmail.com
 EMAIL_PASSWORD=sua_senha_de_app
 
@@ -254,6 +266,8 @@ CHAT_MESSAGE_MAX_CHARS=8000
 ```
 
 Em producao, use `APP_ENV=production`, configure `FRONTEND_URL_PROD`/`CORS_ORIGINS_PROD` com HTTPS, ative `JWT_COOKIE_SECURE=true`, configure `GROQ_VISION_MODEL` com um modelo multimodal para analise real de imagens e use segredos com pelo menos 32 caracteres. `groq/compound-mini` e `groq/compound` ficam recomendados para texto/fallback. A aplicacao falha no boot se a validacao de producao encontrar configuracao insegura ou incompleta.
+
+Para pagamentos, configure na Cakto o webhook apontando para `https://seu-backend/billing/webhook/cakto` e use o mesmo valor de `WEBHOOK_KEY` ou `CAKTO_WEBHOOK_SECRET` no painel e no backend. O checkout deve preservar o parametro `refId` enviado pelo NutriNow para que o webhook encontre a conta correta. Para retorno pos-compra/upsell, use `https://seu-backend/pagamento-aprovado`.
 
 ## Como rodar localmente
 

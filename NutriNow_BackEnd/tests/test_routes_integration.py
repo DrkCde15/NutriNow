@@ -1,3 +1,4 @@
+import os
 import unittest
 from unittest.mock import patch
 
@@ -5,6 +6,7 @@ from flask import Flask
 from flask_jwt_extended import JWTManager, create_access_token
 
 from app.routes.auth import auth_bp
+from app.routes.billing import billing_bp
 from app.routes.chatbot import chatbot_bp
 from app.routes.fitness import fitness_bp
 from app.routes.profile import profile_bp
@@ -67,6 +69,22 @@ class FakeDb:
 
     def __exit__(self, exc_type, exc, traceback):
         return False
+
+
+class BillingFakeCursor:
+    def __init__(self, operations, user=None):
+        self.operations = operations
+        self.user = user
+        self._next_result = None
+
+    def execute(self, query, params=None):
+        normalized = " ".join(query.split())
+        self.operations.append(("sql", normalized, params))
+        if normalized.startswith("SELECT id, email, is_premium, premium_expires_at FROM usuarios"):
+            self._next_result = self.user
+
+    def fetchone(self):
+        return self._next_result
 
 
 class RouteIntegrationTest(unittest.TestCase):
@@ -166,6 +184,88 @@ class RouteIntegrationTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 502)
         self.assertFalse(any(op[0] == "sql" and op[1].startswith("DELETE FROM dieta_treino") for op in operations))
+
+    def test_billing_checkout_adds_user_ref_to_cakto_link(self):
+        app = create_test_app(billing_bp)
+        operations = []
+        cursor = BillingFakeCursor(
+            operations,
+            user={"id": 7, "email": "ana@example.com", "is_premium": 0, "premium_expires_at": None},
+        )
+        conn = FakeConn(operations)
+
+        with patch.dict(os.environ, {"CHECKOUT_LINK": "https://pay.cakto.com.br/teste?offer=abc"}), patch(
+            "app.routes.billing.get_db", return_value=FakeDb(cursor, conn)
+        ), patch("app.routes.billing.ensure_usuario_access_columns"):
+            response = app.test_client().post("/billing/checkout", headers=auth_header(app))
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertIn("refId=nutrinow_user_7", data["checkout_url"])
+        self.assertIn("offer=abc", data["checkout_url"])
+        self.assertFalse(data["alreadyPremium"])
+
+    def test_cakto_webhook_activates_premium_after_paid_order_validation(self):
+        app = create_test_app(billing_bp)
+        operations = []
+        cursor = BillingFakeCursor(
+            operations,
+            user={"id": 7, "email": "ana@example.com", "is_premium": 0, "premium_expires_at": None},
+        )
+        conn = FakeConn(operations)
+        payload = {
+            "event": "purchase_approved",
+            "secret": "webhook-secret",
+            "data": {
+                "id": "order-123",
+                "refId": "nutrinow_user_7",
+                "status": "paid",
+                "customer": {"email": "ana@example.com"},
+            },
+        }
+
+        with patch.dict(os.environ, {"CAKTO_WEBHOOK_SECRET": "", "WEBHOOK_KEY": "webhook-secret"}, clear=False), patch(
+            "app.routes.billing.get_db", return_value=FakeDb(cursor, conn)
+        ), patch("app.routes.billing.ensure_usuario_access_columns"), patch(
+            "app.routes.billing.cakto_service.get_order", return_value={"status": "paid"}
+        ), patch(
+            "app.routes.billing.invalidate_cached_account"
+        ) as invalidate_cache:
+            response = app.test_client().post("/billing/webhook/cakto", json=payload)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["action"], "activated")
+        update_ops = [op for op in operations if op[0] == "sql" and op[1].startswith("UPDATE usuarios")]
+        self.assertEqual(len(update_ops), 1)
+        self.assertEqual(update_ops[0][2][0], 1)
+        self.assertIn(("commit",), operations)
+        invalidate_cache.assert_called_once_with(7)
+
+    def test_cakto_webhook_does_not_activate_when_order_is_not_paid(self):
+        app = create_test_app(billing_bp)
+        operations = []
+        cursor = BillingFakeCursor(
+            operations,
+            user={"id": 7, "email": "ana@example.com", "is_premium": 0, "premium_expires_at": None},
+        )
+        conn = FakeConn(operations)
+        payload = {
+            "event": "purchase_approved",
+            "secret": "webhook-secret",
+            "data": {"id": "order-123", "refId": "nutrinow_user_7", "status": "waiting_payment"},
+        }
+
+        with patch.dict(os.environ, {"CAKTO_WEBHOOK_SECRET": "webhook-secret"}), patch(
+            "app.routes.billing.get_db", return_value=FakeDb(cursor, conn)
+        ), patch("app.routes.billing.ensure_usuario_access_columns"), patch(
+            "app.routes.billing.cakto_service.get_order", return_value={"status": "waiting_payment"}
+        ):
+            response = app.test_client().post("/billing/webhook/cakto", json=payload)
+
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(response.get_json()["reason"], "order_not_paid")
+        self.assertFalse(any(op[0] == "sql" and op[1].startswith("UPDATE usuarios") for op in operations))
+        self.assertNotIn(("commit",), operations)
 
 
 if __name__ == "__main__":

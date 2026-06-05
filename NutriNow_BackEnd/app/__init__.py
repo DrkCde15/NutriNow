@@ -14,6 +14,7 @@ from app.routes.fitness import fitness_bp
 from app.routes.feedbacks import feedback_bp
 from app.routes.calendar import google_calendar_bp
 from app.routes.analytics import analytics_bp
+from app.routes.billing import billing_bp
 from app.database import get_db
 from app.security import build_allowed_origins, env_flag, is_development
 from app.services.production_checks import validate_production_environment
@@ -92,6 +93,7 @@ def create_app():
     app.register_blueprint(feedback_bp)
     app.register_blueprint(google_calendar_bp)
     app.register_blueprint(analytics_bp)
+    app.register_blueprint(billing_bp)
 
     @app.route("/health", methods=["GET"])
     def health():
