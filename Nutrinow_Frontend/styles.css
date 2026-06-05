@@ -242,6 +242,31 @@ p {
   color: var(--foreground);
 }
 
+.plan-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 2.25rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.plan-pill.free {
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+}
+
+.plan-pill.premium {
+  border-color: color-mix(in oklab, var(--primary), transparent 55%);
+  background: color-mix(in oklab, var(--primary), transparent 88%);
+  color: var(--primary);
+}
+
 .mobile-menu-button {
   display: none;
 }
@@ -1618,6 +1643,75 @@ button.icon-btn.mobile-menu-button {
 .empty-state p {
   margin-top: 0.5rem;
   color: var(--muted-foreground);
+}
+
+.premium-lock {
+  display: grid;
+  max-width: 48rem;
+  margin: 0 auto;
+  border: 1px solid var(--border);
+  border-radius: 1.5rem;
+  background: var(--card);
+  padding: clamp(1.5rem, 4vw, 3rem);
+  box-shadow: var(--shadow-lg);
+  text-align: left;
+}
+
+.premium-lock .feature-icon {
+  margin: 0 0 1rem;
+}
+
+.premium-lock h1 {
+  margin-top: 1rem;
+  font-size: clamp(2rem, 5vw, 3rem);
+}
+
+.premium-lock p {
+  max-width: 42rem;
+  margin-top: 0.75rem;
+  color: var(--muted-foreground);
+  line-height: 1.65;
+}
+
+.premium-lock-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.premium-lock-grid div {
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--surface);
+  padding: 1rem;
+}
+
+.premium-lock-grid strong,
+.premium-lock-grid span {
+  display: block;
+}
+
+.premium-lock-grid span {
+  margin-top: 0.35rem;
+  color: var(--muted-foreground);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.premium-modal-backdrop {
+  z-index: 140;
+}
+
+.premium-modal-card {
+  max-width: 28rem;
+}
+
+.premium-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
 }
 
 .modal-backdrop {
@@ -3168,6 +3262,18 @@ body,
   }
 
   .chat-calendar-action {
+    width: 100%;
+  }
+
+  .premium-lock-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .premium-modal-actions {
+    flex-direction: column;
+  }
+
+  .premium-modal-actions .btn {
     width: 100%;
   }
 

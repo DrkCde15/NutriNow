@@ -22,6 +22,15 @@ O projeto combina uma SPA estatica no frontend com uma API Flask no backend. A a
 - Validacao de senha minima e bloqueio de senhas comuns.
 - Rate limit em fluxos sensiveis, como login, cadastro, redefinicao de senha, chat e feedback.
 
+### Acesso Free e Premium
+
+- Contas novas entram como `free` por padrao.
+- Contas free podem acessar Login, Cadastro, Perfil, Chat NutriAI, Feedbacks, Termos de Uso, Privacidade e LGPD.
+- Dashboard, dietas/treinos e Google Calendar exigem conta premium.
+- Ao clicar em atalhos premium com conta free, o frontend exibe um modal com as opcoes Pagar e Fechar.
+- O backend bloqueia APIs premium com `402` e codigo `premium_required`.
+- O estado premium fica em `usuarios.is_premium`, com expiracao opcional em `usuarios.premium_expires_at`.
+
 ### Perfil e dashboard
 
 - Perfil editavel com nome, sobrenome, genero, data de nascimento, e-mail, meta, altura, peso e experiencia com treino.

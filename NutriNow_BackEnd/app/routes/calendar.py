@@ -10,6 +10,7 @@ from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from app.database import get_db
 from app.routes.auth import get_google_oauth_hosts
 from app.security import select_frontend_origin
+from app.services.access_control import premium_required
 from app.services.schema_cache import (
     ensure_dieta_treino_schedule_columns,
     resolve_dieta_user_column,
@@ -544,6 +545,7 @@ def delete_google_calendar_item(user_id, item_id, tipo=None):
 
 @google_calendar_bp.route("/calendar/google/status", methods=["GET"])
 @jwt_required()
+@premium_required
 def google_calendar_status():
     user_id = get_jwt_identity()
 
@@ -578,6 +580,7 @@ def google_calendar_status():
 
 @google_calendar_bp.route("/calendar/google/connect", methods=["GET"])
 @jwt_required()
+@premium_required
 def google_calendar_connect():
     user_id = get_jwt_identity()
 
@@ -650,6 +653,7 @@ def google_calendar_callback():
 
 @google_calendar_bp.route("/calendar/google/sync", methods=["POST"])
 @jwt_required()
+@premium_required
 def google_calendar_sync():
     user_id = get_jwt_identity()
     data = request.get_json(silent=True) or {}
@@ -716,6 +720,7 @@ def google_calendar_sync():
 
 @google_calendar_bp.route("/calendar/google/disconnect", methods=["DELETE"])
 @jwt_required()
+@premium_required
 def google_calendar_disconnect():
     user_id = get_jwt_identity()
 

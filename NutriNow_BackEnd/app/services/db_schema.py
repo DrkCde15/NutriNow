@@ -1,3 +1,6 @@
+from app.services.schema_cache import ensure_usuario_access_columns
+
+
 CORE_SCHEMA_SQL = [
     """
     CREATE TABLE IF NOT EXISTS usuarios (
@@ -8,8 +11,11 @@ CORE_SCHEMA_SQL = [
         genero ENUM('Masculino','Feminino') NOT NULL DEFAULT 'Masculino',
         email VARCHAR(255) NOT NULL UNIQUE,
         senha VARCHAR(255) NOT NULL,
+        is_premium TINYINT(1) NOT NULL DEFAULT 0,
+        premium_expires_at DATETIME NULL,
         criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_usuarios_email (email)
+        INDEX idx_usuarios_email (email),
+        INDEX idx_usuarios_premium (is_premium, premium_expires_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     """,
     """
@@ -154,3 +160,4 @@ CORE_SCHEMA_SQL = [
 def ensure_core_schema(cursor):
     for statement in CORE_SCHEMA_SQL:
         cursor.execute(statement)
+    ensure_usuario_access_columns(cursor)

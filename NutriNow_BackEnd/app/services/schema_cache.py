@@ -10,6 +10,10 @@ DIETA_TREINO_SCHEDULE_COLUMNS = {
     "recurrence_days": "ALTER TABLE dieta_treino ADD COLUMN recurrence_days VARCHAR(32) NULL",
     "recurrence_until": "ALTER TABLE dieta_treino ADD COLUMN recurrence_until DATE NULL",
 }
+USUARIO_ACCESS_COLUMNS = {
+    "is_premium": "ALTER TABLE usuarios ADD COLUMN is_premium TINYINT(1) NOT NULL DEFAULT 0",
+    "premium_expires_at": "ALTER TABLE usuarios ADD COLUMN premium_expires_at DATETIME NULL",
+}
 
 _table_columns_cache = {}
 _cache_lock = Lock()
@@ -73,3 +77,19 @@ def ensure_dieta_treino_schedule_columns(cursor):
         cursor.execute(DIETA_TREINO_SCHEDULE_COLUMNS[column])
 
     invalidate_table_columns("dieta_treino")
+
+
+def ensure_usuario_access_columns(cursor):
+    columns = get_table_columns(cursor, "usuarios")
+    missing_columns = [
+        column
+        for column in USUARIO_ACCESS_COLUMNS
+        if column not in columns
+    ]
+    if not missing_columns:
+        return
+
+    for column in missing_columns:
+        cursor.execute(USUARIO_ACCESS_COLUMNS[column])
+
+    invalidate_table_columns("usuarios")

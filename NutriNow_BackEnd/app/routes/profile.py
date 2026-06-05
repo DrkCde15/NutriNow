@@ -3,6 +3,8 @@ from datetime import datetime, timedelta
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from app.database import get_db
+from app.security import validate_email
+from app.services.access_control import premium_required
 from app.services.account_cache import invalidate_cached_account
 from app.services.schema_cache import resolve_dieta_user_column
 
@@ -214,16 +216,23 @@ def get_perfil():
 @jwt_required()
 def update_perfil():
     user_id = get_jwt_identity()
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict) or not data:
+        return jsonify({"error": "Dados do perfil ausentes"}), 400
+
     nome = data.get("nome")
     sobrenome = data.get("sobrenome")
     genero = data.get("genero")
-    email = data.get("email")
+    raw_email = data.get("email")
+    email = validate_email(raw_email) if raw_email else None
     data_nascimento = data.get("dataNascimento")
     meta = data.get("meta")
     altura = data.get("altura")
     peso = data.get("peso")
     ja_treinou = data.get("ja_treinou")
+
+    if raw_email and not email:
+        return jsonify({"error": "Informe um email valido"}), 400
 
     if data_nascimento:
         parsed_date = None
@@ -235,6 +244,8 @@ def update_perfil():
                 continue
         if parsed_date:
             data_nascimento = parsed_date.strftime("%Y-%m-%d")
+        else:
+            return jsonify({"error": "Informe uma data de nascimento valida"}), 400
 
     try:
         with get_db() as (cursor, conn):
@@ -311,6 +322,7 @@ def delete_perfil():
 
 @profile_bp.route("/dashboard", methods=["GET"])
 @jwt_required()
+@premium_required
 def get_dashboard():
     user_id = get_jwt_identity()
 

@@ -45,6 +45,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     recoverySent: false,
     resetDone: false,
     profileSaved: false,
+    premiumModal: null,
     authExchanging: false,
     dashboard: { loaded: false, loading: false, data: null, error: "" },
     profile: { loaded: false, loading: false, data: null, error: "" },
@@ -53,6 +54,8 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     chatSessions: { loaded: false, loading: false, items: null, error: "" },
     chatHistory: {},
   };
+
+  const PREMIUM_ROUTES = new Set(["/dashboard", "/planos", "/calendario"]);
 
   const analytics = new AnalyticsClient({
     storage: window.localStorage,
@@ -378,6 +381,35 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     return getToken() ? user : null;
   }
 
+  function isPremiumUser(user = getUser()) {
+    return Boolean(user?.is_premium || user?.premium || user?.plan === "premium");
+  }
+
+  function isPremiumRoute(path) {
+    return PREMIUM_ROUTES.has(normalizePath(path));
+  }
+
+  function defaultAuthenticatedPath(user = getUser()) {
+    return isPremiumUser(user) ? "/dashboard" : "/chat";
+  }
+
+  function premiumLabel(user = getUser()) {
+    return isPremiumUser(user) ? "Premium" : "Free";
+  }
+
+  function getPaymentUrl() {
+    return String(window.NUTRINOW_CHECKOUT_URL || window.NUTRINOW_PAYMENT_URL || "").trim();
+  }
+
+  function openPremiumModal(path) {
+    state.premiumModal = { path: normalizePath(path) };
+    render();
+  }
+
+  function shouldOpenPremiumModal(path) {
+    return Boolean(getUser()) && !isPremiumUser() && isPremiumRoute(path);
+  }
+
   function setUser(user) {
     if (user) writeJson(STORAGE.user, user, localStorage);
     else localStorage.removeItem(STORAGE.user);
@@ -479,9 +511,29 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     `;
   }
 
+  function accountActionsMarkup(active, user) {
+    const premium = isPremiumUser(user);
+    return `
+      <span class="plan-pill ${premium ? "premium" : "free"}">${premiumLabel(user)}</span>
+      <a href="/perfil" data-link class="btn btn-ghost ${active === "/perfil" ? "active" : ""}">
+        ${icon("user")} ${escapeHtml(getFirstName(user))}
+      </a>
+      <button class="btn btn-secondary" data-action="logout">${icon("logout")} Sair</button>
+    `;
+  }
+
+  function mobileAccountActionsMarkup(user) {
+    const premium = isPremiumUser(user);
+    return `
+      <span class="plan-pill ${premium ? "premium" : "free"}">${premiumLabel(user)}</span>
+      <a href="/perfil" data-link class="btn btn-secondary">${icon("user")} Perfil (${escapeHtml(getFirstName(user))})</a>
+      <button class="btn btn-secondary" data-action="logout">${icon("logout")} Sair</button>
+    `;
+  }
+
   function headerMarkup(active = "") {
     const user = getUser();
-    const privateLinks = user
+    let privateLinks = user
       ? [
           ["/dashboard", "Dashboard"],
           ["/planos", "Dietas e Treinos"],
@@ -489,7 +541,6 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
           ["/chat", "Chat NutriAI"],
         ]
       : [];
-
     const navLinks = privateLinks
       .map(
         ([to, label]) =>
@@ -498,12 +549,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
       .join("");
 
     const desktopActions = user
-      ? `
-        <a href="/perfil" data-link class="btn btn-ghost ${active === "/perfil" ? "active" : ""}">
-          ${icon("user")} ${escapeHtml(getFirstName(user))}
-        </a>
-        <button class="btn btn-secondary" data-action="logout">${icon("logout")} Sair</button>
-      `
+      ? accountActionsMarkup(active, user)
       : `
         <a href="/login" data-link class="btn btn-ghost">Entrar</a>
         <a href="/cadastro" data-link class="btn btn-dark">Começar grátis</a>
@@ -517,10 +563,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
       .join("");
 
     const mobileActions = user
-      ? `
-        <a href="/perfil" data-link class="btn btn-secondary">${icon("user")} Perfil (${escapeHtml(getFirstName(user))})</a>
-        <button class="btn btn-secondary" data-action="logout">${icon("logout")} Sair</button>
-      `
+      ? mobileAccountActionsMarkup(user)
       : `
         <a href="/login" data-link class="btn btn-secondary">Entrar</a>
         <a href="/cadastro" data-link class="btn btn-dark">Começar grátis</a>
@@ -572,6 +615,33 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
 
   function pageShell(content, active = "") {
     return `<div class="app-shell">${headerMarkup(active)}${content}</div>`;
+  }
+
+  function premiumUpgradeModalMarkup() {
+    if (!state.premiumModal) return "";
+    const path = normalizePath(state.premiumModal.path || "");
+    const titleByPath = {
+      "/dashboard": "Dashboard premium",
+      "/planos": "Planos premium",
+      "/calendario": "Calendario premium",
+    };
+    return `
+      <div class="modal-backdrop premium-modal-backdrop" role="presentation">
+        <section class="modal-card premium-modal-card" role="dialog" aria-modal="true" aria-labelledby="premium-modal-title">
+          <div class="modal-head">
+            <div>
+              <span class="badge">${icon("lock")} Conta Free</span>
+              <h2 id="premium-modal-title">${escapeHtml(titleByPath[path] || "Recurso premium")}</h2>
+              <p class="text-muted" style="margin-top:.45rem;line-height:1.55;">Esse recurso faz parte do plano premium. Sua conta free continua com acesso ao Chat NutriAI, perfil, login, cadastro, feedbacks e paginas legais.</p>
+            </div>
+          </div>
+          <div class="premium-modal-actions">
+            <button type="button" class="btn btn-primary" data-action="pay-premium">${icon("sparkles")} Pagar</button>
+            <button type="button" class="btn btn-secondary" data-action="close-premium-modal">${icon("x")} Fechar</button>
+          </div>
+        </section>
+      </div>
+    `;
   }
 
   function landingPage() {
@@ -1693,6 +1763,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
   function chatPage() {
     const user = getUser();
     if (!user) return loginPage();
+    const premium = isPremiumUser(user);
     const currentId = getCurrentSessionId();
     const sessions = getChatSessions();
     const current = sessions.find((session) => session.id === currentId);
@@ -1715,6 +1786,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
           </div>
           <nav class="chat-nav">
             ${chatNavLink("/chat", "message", "Chat", true)}
+            ${premium ? "" : chatNavLink("/feedbacks", "message", "Feedbacks")}
             ${chatNavLink("/dashboard", "layout", "Dashboard")}
             ${chatNavLink("/planos", "dumbbell", "Planos")}
             ${chatNavLink("/calendario", "calendar", "Calendário")}
@@ -1928,7 +2000,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
       <div class="chat-calendar-notice ${isError ? "alert" : "success-box"}">
         <span>${icon(isError ? "alert" : "checkCircle")} ${escapeHtml(message)}</span>
         <div class="chat-calendar-notice-actions">
-          ${isError ? "" : `<a href="/calendario" data-link>Ver calendário</a>`}
+          ${isError || !isPremiumUser() ? "" : `<a href="/calendario" data-link>Ver calendário</a>`}
           <button type="button" class="mini-icon" data-action="dismiss-chat-calendar-notice" aria-label="Fechar aviso">${icon("x")}</button>
         </div>
       </div>
@@ -1936,6 +2008,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
   }
 
   function workoutCalendarActionsMarkup(message) {
+    if (!isPremiumUser()) return "";
     if (!shouldOfferWorkoutCalendarAction(message)) return "";
     return `
       <div class="chat-calendar-actions" role="group" aria-label="Adicionar treino ao calendário">
@@ -2554,6 +2627,17 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
 
   function render() {
     const path = normalizePath(getCurrentPath());
+    const user = getUser();
+    const hasPendingAuthCode = location.protocol.startsWith("http") && new URLSearchParams(location.search).has("auth_code");
+    if (user && isPremiumRoute(path) && !isPremiumUser(user)) {
+      state.premiumModal = { path };
+      routeTo("/chat", true);
+      return;
+    }
+    if (user && path === "/" && !hasPendingAuthCode) {
+      routeTo(defaultAuthenticatedPath(user), true);
+      return;
+    }
     state.recoverySent = path === "/esqueci-senha" ? state.recoverySent : false;
     state.resetDone = path === "/reset-senha" ? state.resetDone : false;
     const titles = {
@@ -2589,7 +2673,8 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
       "/privacidade": () => legalPage("privacidade"),
       "/lgpd": () => legalPage("lgpd"),
     };
-    app.innerHTML = `${pages[path]()}${analyticsConsentMarkup()}`;
+    const pageRenderer = pages[path];
+    app.innerHTML = `${pageRenderer()}${premiumUpgradeModalMarkup()}${analyticsConsentMarkup()}`;
     ensureAutocompleteAttributes(app);
     bindPage();
     handleBackendRedirectParams(path);
@@ -2630,7 +2715,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
           saveSessionPayload(payload);
           state.authExchanging = false;
           cleanQueryParams(["auth_code"]);
-          routeTo("/", true);
+          routeTo(defaultAuthenticatedPath(payload.user || getUser()), true);
         })
         .catch((error) => {
           state.authExchanging = false;
@@ -2659,6 +2744,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
 
   function scheduleRouteLoads(path) {
     if (!getToken()) return;
+    if (isPremiumRoute(path) && !isPremiumUser()) return;
 
     if (path === "/dashboard" && !state.dashboard.loaded && !state.dashboard.loading) {
       loadDashboard().then(render);
@@ -2696,8 +2782,21 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     app.querySelectorAll("a[data-link]").forEach((link) => {
       link.addEventListener("click", (event) => {
         const href = link.getAttribute("href");
-        if (!href || href.startsWith("#") || href.startsWith("http")) return;
+        if (!href || href.startsWith("http")) return;
+        if (href.startsWith("#/")) {
+          const targetPath = href.slice(1);
+          if (shouldOpenPremiumModal(targetPath)) {
+            event.preventDefault();
+            openPremiumModal(targetPath);
+          }
+          return;
+        }
+        if (href.startsWith("#")) return;
         event.preventDefault();
+        if (shouldOpenPremiumModal(href)) {
+          openPremiumModal(href);
+          return;
+        }
         routeTo(href);
       });
     });
@@ -2727,6 +2826,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     bindProfile();
     bindFeedback();
     bindAnalyticsConsent();
+    bindPremiumModal();
     bindModalClose();
   }
 
@@ -2743,6 +2843,22 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
       button.addEventListener("click", () => {
         analytics.setConsent("declined");
         render();
+      });
+    });
+  }
+
+  function bindPremiumModal() {
+    app.querySelectorAll('[data-action="close-premium-modal"]').forEach((button) => {
+      button.addEventListener("click", () => {
+        state.premiumModal = null;
+        render();
+      });
+    });
+
+    app.querySelectorAll('[data-action="pay-premium"]').forEach((button) => {
+      button.addEventListener("click", () => {
+        const paymentUrl = getPaymentUrl();
+        if (paymentUrl) window.location.href = paymentUrl;
       });
     });
   }
@@ -2800,7 +2916,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
             token: "",
           });
           saveSessionPayload(payload);
-          routeTo("/");
+          routeTo(defaultAuthenticatedPath(payload.user || getUser()));
         } catch (error) {
           setFormError(login, getErrorMessage(error, "Erro ao entrar"));
           button.disabled = false;
@@ -2851,7 +2967,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
             });
             saveSessionPayload(payload);
           }
-          routeTo("/");
+          routeTo(defaultAuthenticatedPath(getUser()));
         } catch (error) {
           setFormError(cadastro, getErrorMessage(error, "Erro ao cadastrar"));
           button.disabled = false;

@@ -35,8 +35,10 @@ from app.security import (
     validate_password,
 )
 from app.services.agent_service import clear_user_agents
+from app.services.access_control import account_is_premium, account_plan
 from app.services.account_cache import get_cached_account, set_cached_account
 from app.services.mail_service import envoyer_email
+from app.services.schema_cache import ensure_usuario_access_columns
 
 logger = logging.getLogger(__name__)
 auth_bp = Blueprint("auth", __name__)
@@ -158,13 +160,21 @@ def _optional_float(value):
         return None
     return float(value)
 
+def _serialize_datetime(value):
+    return value.isoformat() if hasattr(value, "isoformat") else value
+
 def _account_payload(user):
+    is_premium = account_is_premium(user)
     return {
         "id": user["id"],
         "nome": user["nome"],
         "email": user["email"],
         "altura": _optional_float(user.get("altura")),
         "peso": _optional_float(user.get("peso")),
+        "is_premium": is_premium,
+        "premium": is_premium,
+        "plan": account_plan(user),
+        "premium_expires_at": _serialize_datetime(user.get("premium_expires_at")),
     }
 
 def _refresh_cookie_max_age():
@@ -181,9 +191,10 @@ def _account_by_id(user_id):
         return cached_user
 
     with get_db() as (cursor, conn):
+        ensure_usuario_access_columns(cursor)
         cursor.execute(
             """
-            SELECT u.id, u.nome, u.email, p.altura, p.peso
+            SELECT u.id, u.nome, u.email, u.is_premium, u.premium_expires_at, p.altura, p.peso
             FROM usuarios u
             LEFT JOIN perfil p ON u.id = p.usuario_id
             WHERE u.id=%s
@@ -245,6 +256,7 @@ def cadastro():
     try:
         senha_hash = generate_password_hash(senha)
         with get_db() as (cursor, conn):
+            ensure_usuario_access_columns(cursor)
             cursor.execute(
                 """
                 INSERT INTO usuarios (nome, sobrenome, data_nascimento, genero, email, senha)
@@ -270,6 +282,8 @@ def cadastro():
             "email": email,
             "altura": altura,
             "peso": peso,
+            "is_premium": 0,
+            "premium_expires_at": None,
         }
         return _auth_response(user, "Conta criada com sucesso!"), 201
     except IntegrityError as exc:
@@ -298,9 +312,10 @@ def login():
 
     try:
         with get_db() as (cursor, conn):
+            ensure_usuario_access_columns(cursor)
             cursor.execute(
                 """
-                SELECT u.id, u.nome, u.email, u.senha, p.altura, p.peso
+                SELECT u.id, u.nome, u.email, u.senha, u.is_premium, u.premium_expires_at, p.altura, p.peso
                 FROM usuarios u
                 LEFT JOIN perfil p ON u.id = p.usuario_id
                 WHERE u.email=%s
@@ -460,9 +475,10 @@ def exchange_google_auth_code():
 
     try:
         with get_db() as (cursor, conn):
+            ensure_usuario_access_columns(cursor)
             cursor.execute(
                 """
-                SELECT u.id, u.nome, u.email, p.altura, p.peso
+                SELECT u.id, u.nome, u.email, u.is_premium, u.premium_expires_at, p.altura, p.peso
                 FROM usuarios u
                 LEFT JOIN perfil p ON u.id = p.usuario_id
                 WHERE u.id=%s

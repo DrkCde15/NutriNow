@@ -4,6 +4,7 @@ from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from app.database import get_db
 from app.routes.calendar import delete_google_calendar_item, sync_google_calendar_item
+from app.services.access_control import premium_required
 from app.services.runtime_cache import TTLCache
 from app.services.schema_cache import ensure_dieta_treino_schedule_columns
 
@@ -12,6 +13,7 @@ fitness_bp = Blueprint("fitness", __name__)
 
 WEEKDAY_ORDER = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
 ITEMS_CACHE_SECONDS = 20
+BLOCKING_CALENDAR_DELETE_REASONS = {"google_error", "not_connected", "server_error"}
 
 _items_cache = TTLCache(ttl_seconds=ITEMS_CACHE_SECONDS, max_items=512)
 
@@ -105,6 +107,7 @@ def _parse_schedule_payload(data):
 
 @fitness_bp.route("/dieta-treino", methods=["GET"])
 @jwt_required()
+@premium_required
 def get_items():
     user_id = get_jwt_identity()
     aba = request.args.get("tipo", "treinos")
@@ -147,6 +150,7 @@ def get_items():
 
 @fitness_bp.route("/dieta-treino", methods=["POST"])
 @jwt_required()
+@premium_required
 def add_item():
     user_id = get_jwt_identity()
     data = request.get_json() or {}
@@ -251,6 +255,7 @@ def add_item():
 
 @fitness_bp.route("/dieta-treino/<int:item_id>", methods=["PUT"])
 @jwt_required()
+@premium_required
 def update_item(item_id):
     user_id = get_jwt_identity()
     data = request.get_json() or {}
@@ -360,9 +365,33 @@ def update_item(item_id):
 
 @fitness_bp.route("/dieta-treino/<int:item_id>", methods=["DELETE"])
 @jwt_required()
+@premium_required
 def delete_item(item_id):
     user_id = get_jwt_identity()
     try:
+        with get_db() as (cursor, conn):
+            cursor.execute(
+                "SELECT id, tipo FROM dieta_treino WHERE id = %s AND user_id = %s",
+                (item_id, user_id),
+            )
+            item = cursor.fetchone()
+
+        if not item:
+            return jsonify({"error": "Item nao encontrado"}), 404
+
+        calendar_delete = delete_google_calendar_item(user_id, item_id, item.get("tipo"))
+        if calendar_delete.get("reason") in BLOCKING_CALENDAR_DELETE_REASONS:
+            status_code = 409 if calendar_delete.get("reason") == "not_connected" else 502
+            return (
+                jsonify(
+                    {
+                        "error": "Falha ao excluir evento sincronizado no Google Calendar",
+                        "googleCalendar": calendar_delete,
+                    }
+                ),
+                status_code,
+            )
+
         with get_db() as (cursor, conn):
             cursor.execute("DELETE FROM dieta_treino WHERE id = %s AND user_id = %s", (item_id, user_id))
             deleted = cursor.rowcount
@@ -372,7 +401,6 @@ def delete_item(item_id):
         if deleted == 0:
             return jsonify({"error": "Item nao encontrado"}), 404
 
-        calendar_delete = delete_google_calendar_item(user_id, item_id)
         return (
             jsonify(
                 {
