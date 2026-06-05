@@ -479,7 +479,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
   }
 
   function routeHref(path) {
-    return `#${path}`;
+    return location.protocol.startsWith("http") ? path : `#${path}`;
   }
 
   function getCurrentPath() {
@@ -494,19 +494,14 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     state.planModal = null;
     state.calendarModal = null;
     state.chatSidebarOpen = false;
-    if (path === "/" && location.protocol.startsWith("http")) {
+    if (location.protocol.startsWith("http")) {
       const updateHistory = replace ? history.replaceState.bind(history) : history.pushState.bind(history);
-      updateHistory({}, "", "/");
+      updateHistory({}, "", path || "/");
       render();
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
     const nextHash = `#${path}`;
-    if (replace && location.protocol.startsWith("http")) {
-      history.replaceState({}, "", `${location.pathname}${location.search}${nextHash}`);
-      render();
-      return;
-    }
     if (location.hash !== nextHash) {
       location.hash = nextHash;
     } else {
@@ -606,7 +601,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     return `
       <header class="site-header">
         <nav class="site-nav container">
-          <a href="/" data-link class="brand" aria-label="NutriNow">${brandMarkup()}</a>
+          <a href="/" class="brand" aria-label="NutriNow">${brandMarkup()}</a>
           <div class="nav-links">${navLinks}</div>
           <div class="nav-actions">${desktopActions}</div>
           <button class="icon-btn mobile-menu-button" data-action="toggle-mobile-menu" aria-label="Abrir menu">
@@ -627,7 +622,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     return `
       <footer class="site-footer">
         <div class="footer-inner container">
-          <a href="/" data-link class="brand">
+          <a href="/" class="brand">
             <span class="brand-logo" style="width:1.75rem;height:1.75rem;border-radius:.55rem;background:var(--gradient-hero);color:var(--primary-foreground);box-shadow:none;">
               ${icon("leaf")}
             </span>
@@ -990,7 +985,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     return `
       <div class="auth-layout">
         <section class="auth-panel">
-          <a href="/" data-link class="brand">${brandMarkup()}</a>
+          <a href="/" class="brand">${brandMarkup()}</a>
           <div class="auth-form-wrap">
             <h1>${title}</h1>
             <p>${subtitle}</p>
