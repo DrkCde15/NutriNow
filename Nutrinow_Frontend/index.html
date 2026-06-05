@@ -19,7 +19,7 @@
     <link rel="icon" type="image/png" href="./assets/logo.png?v=20260521-tab-logo" />
     <link rel="apple-touch-icon" href="./assets/logo.png?v=20260521-tab-logo" />
     <link rel="preload" as="image" href="./assets/hero-nutrition.jpg" />
-    <link rel="stylesheet" href="./styles.css?v=20260521-api-autocomplete" />
+    <link rel="stylesheet" href="./styles.css?v=20260605-index-route" />
     <style>
       .hero-media {
         width: min(100%, 30rem) !important;
@@ -42,6 +42,11 @@
   </head>
   <body>
     <div id="app"></div>
-    <script type="module" src="./app.js?v=20260521-api-autocomplete"></script>
+    <script>
+      if (location.protocol.startsWith("http") && location.hash.startsWith("#/")) {
+        history.replaceState({}, "", (location.pathname || "/") + location.search);
+      }
+    </script>
+    <script type="module" src="./app.js?v=20260605-index-route"></script>
   </body>
 </html>

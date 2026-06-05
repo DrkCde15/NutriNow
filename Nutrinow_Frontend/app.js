@@ -534,6 +534,13 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     return valid.has(path) ? path : "/";
   }
 
+  function cleanLegacyHashRoute() {
+    if (!location.protocol.startsWith("http") || !location.hash.startsWith("#/")) return false;
+    const currentPath = normalizePath(location.pathname || "/");
+    history.replaceState({}, "", `${currentPath}${location.search}`);
+    return true;
+  }
+
   function brandMarkup() {
     return `
       <span class="brand-logo"><img src="${ASSETS.logo}" alt="NutriNow" width="36" height="36" decoding="async"></span>
@@ -2728,6 +2735,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
   }
 
   function render() {
+    cleanLegacyHashRoute();
     const path = normalizePath(getCurrentPath());
     const user = getUser();
     if (user && isPremiumRoute(path) && !isPremiumUser(user)) {
