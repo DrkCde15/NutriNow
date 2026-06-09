@@ -2804,6 +2804,81 @@ button.icon-btn.mobile-menu-button {
   padding: 2rem;
 }
 
+.feedback-list-section {
+  margin-top: 1.5rem;
+}
+
+.feedback-list-head {
+  max-width: 42rem;
+}
+
+.feedback-list-head h2 {
+  font-size: clamp(1.5rem, 4vw, 2rem);
+}
+
+.feedback-list-head p {
+  margin-top: 0.35rem;
+  line-height: 1.55;
+}
+
+.feedback-list {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.feedback-item {
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--card);
+  padding: 1.15rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.feedback-item-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.feedback-item-top strong,
+.feedback-item-top small {
+  display: block;
+}
+
+.feedback-item-top small {
+  margin-top: 0.25rem;
+  color: var(--muted-foreground);
+  font-size: 0.8rem;
+}
+
+.feedback-item-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.feedback-stars {
+  display: inline-flex;
+  gap: 0.18rem;
+  color: var(--muted-foreground);
+}
+
+.feedback-stars .active {
+  color: var(--primary);
+}
+
+.feedback-message {
+  margin-top: 0.85rem;
+  color: var(--muted-foreground);
+  line-height: 1.65;
+}
+
+.empty-state.compact {
+  padding: 1.5rem;
+}
+
 .legal-page {
   background: linear-gradient(180deg, #effcf7 0%, #ffffff 38%, #fbfffd 100%);
 }

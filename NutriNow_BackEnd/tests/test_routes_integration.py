@@ -1,5 +1,6 @@
 import os
 import unittest
+from datetime import datetime
 from unittest.mock import patch
 
 from flask import Flask
@@ -8,6 +9,7 @@ from flask_jwt_extended import JWTManager, create_access_token
 from app.routes.auth import auth_bp
 from app.routes.billing import billing_bp
 from app.routes.chatbot import chatbot_bp
+from app.routes.feedbacks import feedback_bp
 from app.routes.fitness import fitness_bp
 from app.routes.profile import profile_bp
 
@@ -49,6 +51,39 @@ class FakeCursor:
 
     def fetchone(self):
         return self._next_result
+
+
+class FeedbackFakeCursor:
+    def __init__(self, operations, columns=None, user=None, insert_id=42, feedback_rows=None, deleted_rows=1):
+        self.operations = operations
+        self.columns = columns or {"id", "user_id", "nome", "email", "rating", "message", "created_at"}
+        self.user = user
+        self.feedback_rows = feedback_rows or []
+        self.deleted_rows = deleted_rows
+        self.lastrowid = insert_id
+        self.rowcount = 0
+        self._next_result = None
+        self._next_rows = []
+
+    def execute(self, query, params=None):
+        normalized = " ".join(query.split())
+        self.operations.append(("sql", normalized, params))
+        if normalized.startswith("SELECT column_name FROM information_schema.columns"):
+            self._next_rows = [{"column_name": column} for column in self.columns]
+        elif normalized.startswith("ALTER TABLE feedbacks ADD COLUMN"):
+            self.columns.add(normalized.split(" ADD COLUMN ", 1)[1].split(" ", 1)[0])
+        elif normalized.startswith("SELECT nome, email FROM usuarios"):
+            self._next_result = self.user
+        elif normalized.startswith("SELECT id, user_id, nome, rating, message, created_at FROM feedbacks"):
+            self._next_rows = self.feedback_rows
+        elif normalized.startswith("DELETE FROM feedbacks"):
+            self.rowcount = self.deleted_rows
+
+    def fetchone(self):
+        return self._next_result
+
+    def fetchall(self):
+        return self._next_rows
 
 
 class FakeConn:
@@ -140,6 +175,116 @@ class RouteIntegrationTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 400)
         get_agent.assert_not_called()
+
+    def test_feedback_saves_public_feedback(self):
+        app = create_test_app(feedback_bp)
+        operations = []
+        cursor = FeedbackFakeCursor(operations)
+        conn = FakeConn(operations)
+
+        with patch("app.routes.feedbacks.get_db", return_value=FakeDb(cursor, conn)), patch(
+            "app.routes.feedbacks.check_rate_limit", return_value=(True, None)
+        ), patch.dict(os.environ, {"EMAIL_SENDER": "owner@example.com"}), patch(
+            "app.routes.feedbacks.envoyer_email", return_value=True
+        ), patch(
+            "app.routes.feedbacks._feedbacks_table_ready", False
+        ):
+            response = app.test_client().post(
+                "/api/feedbacks",
+                json={
+                    "rating": 5,
+                    "name": "Valeria Oliveira",
+                    "message": "Site muito funcional, vale a pena testar e usar. Adorei!!",
+                },
+            )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(response.get_json()["success"])
+        insert_op = next(op for op in operations if op[0] == "sql" and op[1].startswith("INSERT INTO feedbacks"))
+        self.assertEqual(
+            insert_op[2],
+            (None, "Valeria Oliveira", None, 5, "Site muito funcional, vale a pena testar e usar. Adorei!!"),
+        )
+        self.assertIn(("commit",), operations)
+
+    def test_feedback_adds_missing_columns_before_insert(self):
+        app = create_test_app(feedback_bp)
+        operations = []
+        cursor = FeedbackFakeCursor(operations, columns={"id"})
+        conn = FakeConn(operations)
+
+        with patch("app.routes.feedbacks.get_db", return_value=FakeDb(cursor, conn)), patch(
+            "app.routes.feedbacks.check_rate_limit", return_value=(True, None)
+        ), patch.dict(os.environ, {"EMAIL_SENDER": "owner@example.com"}), patch(
+            "app.routes.feedbacks.envoyer_email", return_value=True
+        ), patch("app.routes.feedbacks._feedbacks_table_ready", False):
+            response = app.test_client().post(
+                "/api/feedbacks",
+                json={"rating": 4, "name": "Ana", "message": "Gostei bastante da experiencia."},
+            )
+
+        self.assertEqual(response.status_code, 201)
+        alter_ops = [op for op in operations if op[0] == "sql" and op[1].startswith("ALTER TABLE feedbacks")]
+        self.assertGreaterEqual(len(alter_ops), 5)
+        self.assertIn(("commit",), operations)
+
+    def test_feedback_list_returns_public_recent_feedbacks(self):
+        app = create_test_app(feedback_bp)
+        operations = []
+        cursor = FeedbackFakeCursor(
+            operations,
+            feedback_rows=[
+                {
+                    "id": 10,
+                    "user_id": 7,
+                    "nome": "Valeria Oliveira",
+                    "email": "valeria@example.com",
+                    "rating": 5,
+                    "message": "Site muito funcional.",
+                    "created_at": datetime(2026, 6, 9, 12, 30),
+                }
+            ],
+        )
+        conn = FakeConn(operations)
+
+        with patch("app.routes.feedbacks.get_db", return_value=FakeDb(cursor, conn)), patch(
+            "app.routes.feedbacks._feedbacks_table_ready", False
+        ):
+            response = app.test_client().get("/api/feedbacks?limit=3", headers=auth_header(app))
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data["items"][0]["name"], "Valeria Oliveira")
+        self.assertEqual(data["items"][0]["rating"], 5)
+        self.assertTrue(data["items"][0]["canDelete"])
+        self.assertNotIn("email", data["items"][0])
+        select_op = next(op for op in operations if op[0] == "sql" and op[1].startswith("SELECT id, user_id"))
+        self.assertEqual(select_op[2], (3,))
+
+    def test_feedback_delete_removes_only_current_user_feedback(self):
+        app = create_test_app(feedback_bp)
+        operations = []
+        cursor = FeedbackFakeCursor(operations, deleted_rows=1)
+        conn = FakeConn(operations)
+
+        with patch("app.routes.feedbacks.get_db", return_value=FakeDb(cursor, conn)), patch(
+            "app.routes.feedbacks._feedbacks_table_ready", False
+        ):
+            response = app.test_client().delete("/api/feedbacks/10", headers=auth_header(app))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.get_json()["success"])
+        delete_op = next(op for op in operations if op[0] == "sql" and op[1].startswith("DELETE FROM feedbacks"))
+        self.assertEqual(delete_op[2], (10, 7))
+        self.assertIn(("commit",), operations)
+
+    def test_feedback_delete_requires_session(self):
+        app = create_test_app(feedback_bp)
+        with patch("app.routes.feedbacks.get_db") as get_db, patch("app.routes.feedbacks.logger.warning"):
+            response = app.test_client().delete("/api/feedbacks/10")
+
+        self.assertEqual(response.status_code, 401)
+        get_db.assert_not_called()
 
     def test_delete_item_removes_google_event_before_local_row(self):
         app = create_test_app(fitness_bp)

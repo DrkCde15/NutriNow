@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
-from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 from werkzeug.middleware.proxy_fix import ProxyFix
 from app.routes.auth import auth_bp
 from app.routes.chatbot import chatbot_bp
@@ -157,6 +157,15 @@ def create_app():
     @app.errorhandler(RequestEntityTooLarge)
     def request_entity_too_large(_error):
         return jsonify({"error": "Arquivo excede o limite permitido"}), 413
+
+    @app.errorhandler(HTTPException)
+    def http_error(error):
+        return jsonify({"error": error.description or error.name}), error.code
+
+    @app.errorhandler(Exception)
+    def internal_error(error):
+        logger.exception("Erro interno nao tratado: %s", error)
+        return jsonify({"error": "Erro interno no servidor. Tente novamente em instantes."}), 500
 
     @app.after_request
     def add_security_headers(response):

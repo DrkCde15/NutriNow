@@ -14,6 +14,14 @@ USUARIO_ACCESS_COLUMNS = {
     "is_premium": "ALTER TABLE usuarios ADD COLUMN is_premium TINYINT(1) NOT NULL DEFAULT 0",
     "premium_expires_at": "ALTER TABLE usuarios ADD COLUMN premium_expires_at DATETIME NULL",
 }
+FEEDBACKS_COLUMNS = {
+    "user_id": "ALTER TABLE feedbacks ADD COLUMN user_id INT NULL",
+    "nome": "ALTER TABLE feedbacks ADD COLUMN nome VARCHAR(120) NOT NULL DEFAULT 'Anonimo'",
+    "email": "ALTER TABLE feedbacks ADD COLUMN email VARCHAR(255) NULL",
+    "rating": "ALTER TABLE feedbacks ADD COLUMN rating TINYINT UNSIGNED NOT NULL DEFAULT 5",
+    "message": "ALTER TABLE feedbacks ADD COLUMN message TEXT NULL",
+    "created_at": "ALTER TABLE feedbacks ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP",
+}
 
 _table_columns_cache = {}
 _cache_lock = Lock()
@@ -93,3 +101,19 @@ def ensure_usuario_access_columns(cursor):
         cursor.execute(USUARIO_ACCESS_COLUMNS[column])
 
     invalidate_table_columns("usuarios")
+
+
+def ensure_feedbacks_columns(cursor):
+    columns = get_table_columns(cursor, "feedbacks")
+    missing_columns = [
+        column
+        for column in FEEDBACKS_COLUMNS
+        if column not in columns
+    ]
+    if not missing_columns:
+        return
+
+    for column in missing_columns:
+        cursor.execute(FEEDBACKS_COLUMNS[column])
+
+    invalidate_table_columns("feedbacks")

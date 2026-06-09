@@ -1,4 +1,4 @@
-from app.services.schema_cache import ensure_usuario_access_columns
+from app.services.schema_cache import ensure_feedbacks_columns, ensure_usuario_access_columns
 
 
 CORE_SCHEMA_SQL = [
@@ -161,3 +161,4 @@ def ensure_core_schema(cursor):
     for statement in CORE_SCHEMA_SQL:
         cursor.execute(statement)
     ensure_usuario_access_columns(cursor)
+    ensure_feedbacks_columns(cursor)

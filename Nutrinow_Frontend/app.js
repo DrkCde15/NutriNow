@@ -42,6 +42,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     chatCalendarError: "",
     feedbackRating: 0,
     feedbackSubmitted: false,
+    feedbacks: { loaded: false, loading: false, deletingId: null, items: [], error: "" },
     recoverySent: false,
     resetDone: false,
     paymentReturn: { checking: false, checked: false, error: "" },
@@ -57,6 +58,8 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
   };
 
   const PREMIUM_ROUTES = new Set(["/dashboard", "/planos", "/calendario"]);
+  const FEEDBACK_REFRESH_INTERVAL_MS = 10000;
+  let feedbackRefreshTimer = null;
 
   const analytics = new AnalyticsClient({
     storage: window.localStorage,
@@ -284,9 +287,21 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     return response.text();
   }
 
+  function isHtmlDocument(value) {
+    const text = String(value || "").trim().toLowerCase();
+    return text.startsWith("<!doctype html") || text.startsWith("<html") || text.includes("<title>");
+  }
+
+  function httpErrorMessage(status) {
+    if (status >= 500) return "Erro interno no servidor. Tente novamente em instantes.";
+    if (status === 404) return "Recurso não encontrado.";
+    return `Erro HTTP ${status}`;
+  }
+
   function buildApiError(response, data) {
     const message = typeof data === "object" && data ? data.error || data.message : data;
-    const error = new Error(message || `Erro HTTP ${response.status}`);
+    const safeMessage = typeof message === "string" && isHtmlDocument(message) ? "" : message;
+    const error = new Error(safeMessage || httpErrorMessage(response.status));
     error.status = response.status;
     error.payload = data;
     return error;
@@ -699,7 +714,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
               <p>Planos de dieta e treino personalizados, análise de refeições pela foto e um assistente que conversa com você 24/7. Tudo em um só lugar.</p>
               <div class="hero-actions">
                 <a href="/cadastro" data-link class="btn btn-primary">Criar conta grátis ${icon("arrowRight")}</a>
-                <a href="#how" class="btn btn-secondary">Ver como funciona</a>
+                <a href="#features" class="btn btn-secondary">Ver como funciona</a>
               </div>
               <div class="hero-checks">
                 <span>${icon("check")} Sem cartão</span>
@@ -730,7 +745,6 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
         </section>
         ${bmiMarkup("home-bmi", userWeight, userHeight)}
         ${featuresMarkup()}
-        ${howMarkup()}
         ${ctaMarkup()}
       </main>
       ${footerMarkup()}
@@ -741,10 +755,27 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
 
   function featuresMarkup() {
     const items = [
-      ["apple", "Dietas personalizadas", "Cardápios montados pela IA com base no seu objetivo, restrições e rotina."],
-      ["dumbbell", "Treinos sob medida", "Programas semanais adaptados ao seu nível, equipamento e tempo disponível."],
-      ["camera", "Análise por foto", "Tire foto da refeição e receba estimativa de calorias e macros na hora."],
-      ["message", "Chat com NutriAI", "Tire dúvidas, ajuste planos e receba motivação a qualquer hora do dia."],
+      {
+        iconName: "apple",
+        title: "Dietas personalizadas",
+        description: "Cardápios montados pela IA com base no seu objetivo, restrições e rotina.",
+      },
+      {
+        iconName: "dumbbell",
+        title: "Treinos sob medida",
+        description: "Programas semanais adaptados ao seu nível, equipamento e tempo disponível.",
+      },
+      {
+        iconName: "camera",
+        title: "Análise por foto",
+        description: "Tire foto da refeição e receba estimativa de calorias e macros na hora.",
+      },
+      {
+        iconName: "message",
+        title: "Chat com NutriAI",
+        description: "Tire dúvidas, ajuste planos e receba motivação a qualquer hora do dia.",
+        href: routeHref("/chat"),
+      },
     ];
     return `
       <section class="section" id="features">
@@ -754,52 +785,23 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
             <p>Um app completo que combina nutrição, treino e inteligência artificial numa experiência simples.</p>
           </div>
           <div class="features-grid">
-            ${items
-              .map(
-                ([name, title, desc]) => `
-                <article class="feature-card">
-                  <span class="feature-icon">${icon(name, "icon-xl")}</span>
-                  <h3>${title}</h3>
-                  <p>${desc}</p>
-                </article>
-              `,
-              )
-              .join("")}
+            ${items.map(featureCardMarkup).join("")}
           </div>
         </div>
       </section>
     `;
   }
 
-  function howMarkup() {
-    const steps = [
-      ["01", "Crie seu perfil", "Conte seus objetivos, preferências e restrições em 2 minutos."],
-      ["02", "Receba seu plano", "A NutriAI monta dieta e treino personalizados para você."],
-      ["03", "Acompanhe e evolua", "Registre refeições, treinos e veja seu progresso em tempo real."],
-    ];
-    return `
-      <section class="section surface" id="how">
-        <div class="container">
-          <div class="section-heading">
-            <h2>Como funciona</h2>
-            <p>Em três passos você já está no caminho de uma vida mais saudável.</p>
-          </div>
-          <div class="steps-grid">
-            ${steps
-              .map(
-                ([n, title, desc]) => `
-                  <article class="step-card">
-                    <span class="step-number text-gradient">${n}</span>
-                    <h3>${title}</h3>
-                    <p>${desc}</p>
-                  </article>
-                `,
-              )
-              .join("")}
-          </div>
-        </div>
-      </section>
+  function featureCardMarkup(item) {
+    const content = `
+      <span class="feature-icon">${icon(item.iconName, "icon-xl")}</span>
+      <h3>${item.title}</h3>
+      <p>${item.description}</p>
     `;
+    if (item.href) {
+      return `<a href="${item.href}" data-link class="feature-card">${content}</a>`;
+    }
+    return `<article class="feature-card">${content}</article>`;
   }
 
   function ctaMarkup() {
@@ -2620,6 +2622,138 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     }
   }
 
+  function mapFeedback(item) {
+    return {
+      id: item.id,
+      name: item.name || "Anonimo",
+      rating: Math.max(1, Math.min(Number(item.rating) || 0, 5)),
+      message: item.message || "",
+      createdAt: item.createdAt || item.created_at || "",
+      canDelete: Boolean(item.canDelete),
+    };
+  }
+
+  async function loadFeedbacks(force = false, options = {}) {
+    const { silent = false } = options;
+    if (!force && state.feedbacks.loaded) return;
+    if (state.feedbacks.loading) return;
+
+    state.feedbacks.loading = !silent || !state.feedbacks.loaded;
+    if (!silent) state.feedbacks.error = "";
+    try {
+      const data = await apiRequest("/api/feedbacks?limit=12");
+      state.feedbacks.items = (data.items || []).map(mapFeedback);
+      state.feedbacks.loaded = true;
+      state.feedbacks.error = "";
+    } catch (error) {
+      if (!silent || !state.feedbacks.items.length) {
+        state.feedbacks.error = getErrorMessage(error, "Erro ao carregar feedbacks");
+      }
+      state.feedbacks.loaded = true;
+    } finally {
+      state.feedbacks.loading = false;
+    }
+  }
+
+  function prependFeedback(item) {
+    const next = mapFeedback(item);
+    state.feedbacks.items = [
+      next,
+      ...state.feedbacks.items.filter((feedback) => String(feedback.id) !== String(next.id)),
+    ].slice(0, 12);
+    state.feedbacks.loaded = true;
+    state.feedbacks.error = "";
+  }
+
+  function updateFeedbackListRegion() {
+    const region = app.querySelector("[data-feedback-list-region]");
+    if (!region) return false;
+    region.innerHTML = feedbackListMarkup();
+    bindFeedbackListActions();
+    return true;
+  }
+
+  function isFeedbacksRoute() {
+    return normalizePath(getCurrentPath()) === "/feedbacks";
+  }
+
+  async function refreshFeedbackList() {
+    if (!isFeedbacksRoute() || document.hidden) return;
+    await loadFeedbacks(true, { silent: true });
+    updateFeedbackListRegion();
+  }
+
+  function startFeedbackAutoRefresh() {
+    if (feedbackRefreshTimer) return;
+    feedbackRefreshTimer = window.setInterval(refreshFeedbackList, FEEDBACK_REFRESH_INTERVAL_MS);
+  }
+
+  function stopFeedbackAutoRefresh() {
+    if (!feedbackRefreshTimer) return;
+    window.clearInterval(feedbackRefreshTimer);
+    feedbackRefreshTimer = null;
+  }
+
+  function syncFeedbackAutoRefresh(path) {
+    if (path === "/feedbacks") startFeedbackAutoRefresh();
+    else stopFeedbackAutoRefresh();
+  }
+
+  function feedbackStarsMarkup(rating) {
+    return Array.from({ length: 5 }, (_, index) => {
+      const active = index < rating ? "active" : "";
+      return `<span class="${active}">${icon("star")}</span>`;
+    }).join("");
+  }
+
+  function feedbackItemMarkup(item) {
+    const isDeleting = String(state.feedbacks.deletingId || "") === String(item.id || "");
+    return `
+      <article class="feedback-item">
+        <div class="feedback-item-top">
+          <div>
+            <strong>${escapeHtml(item.name)}</strong>
+            <small>${formatShortDate(item.createdAt)}</small>
+          </div>
+          <div class="feedback-item-actions">
+            <div class="feedback-stars" aria-label="${item.rating} de 5 estrelas">
+              ${feedbackStarsMarkup(item.rating)}
+            </div>
+            ${
+              item.canDelete
+                ? `<button type="button" class="mini-icon danger" data-action="delete-feedback" data-id="${escapeHtml(item.id)}" aria-label="Excluir feedback" title="Excluir feedback" ${isDeleting ? "disabled" : ""}>${icon("trash")}</button>`
+                : ""
+            }
+          </div>
+        </div>
+        <p class="feedback-message">${escapeHtml(item.message)}</p>
+      </article>
+    `;
+  }
+
+  function feedbackListMarkup() {
+    const feedbacks = state.feedbacks.items;
+    const statusMarkup = state.feedbacks.error
+      ? `<div class="alert" style="margin-top:1rem;">${icon("alert")} ${escapeHtml(state.feedbacks.error)}</div>`
+      : !state.feedbacks.loaded
+        ? `<div class="empty-state compact">${icon("message")} <h3>Carregando feedbacks...</h3></div>`
+        : !feedbacks.length
+          ? `<div class="empty-state compact">${icon("message")} <h3>Ainda não há feedbacks publicados.</h3></div>`
+          : "";
+
+    return `
+      <section class="feedback-list-section" aria-label="Feedbacks publicados">
+        <div class="feedback-list-head">
+          <div>
+            <h2>Feedbacks publicados</h2>
+            <p class="text-muted">Veja o que outros usuários contaram sobre a experiência.</p>
+          </div>
+        </div>
+        ${statusMarkup || `<div class="feedback-list">${feedbacks.map(feedbackItemMarkup).join("")}</div>`}
+      </section>
+    `;
+  }
+
   function feedbacksPage() {
     return pageShell(
       `
@@ -2670,6 +2804,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
               }
             </div>
           </section>
+          <div data-feedback-list-region>${feedbackListMarkup()}</div>
         </div>
       </main>
       `,
@@ -2788,6 +2923,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     bindPage();
     handleBackendRedirectParams(path);
     analytics.trackPageView(path, document.title);
+    syncFeedbackAutoRefresh(path);
     scheduleRouteLoads(path);
     requestAnimationFrame(() => {
       app.querySelectorAll("[data-bmi]").forEach((root) => updateBmi(root));
@@ -2852,6 +2988,12 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
   }
 
   function scheduleRouteLoads(path) {
+    if (path === "/feedbacks" && !state.feedbacks.loaded && !state.feedbacks.loading) {
+      loadFeedbacks().then(() => {
+        if (!updateFeedbackListRegion()) render();
+      });
+    }
+
     if (!getToken()) return;
     if (isPremiumRoute(path) && !isPremiumUser()) return;
 
@@ -3790,6 +3932,8 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
       });
     });
 
+    bindFeedbackListActions();
+
     const form = app.querySelector('[data-form="feedback"]');
     if (form) {
       form.addEventListener("submit", async (event) => {
@@ -3802,22 +3946,59 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
         const button = form.querySelector('button[type="submit"]');
         button.disabled = true;
         try {
-          await apiRequest("/feedbacks", {
+          const payload = {
+            rating: state.feedbackRating,
+            name: String(data.get("name") || "").trim() || getUser()?.nome || "",
+            message,
+          };
+          const result = await apiRequest("/api/feedbacks", {
             method: "POST",
-            body: JSON.stringify({
-              rating: state.feedbackRating,
-              name: String(data.get("name") || "").trim() || getUser()?.nome || "",
-              message,
-            }),
+            body: JSON.stringify(payload),
           });
+          prependFeedback(
+            result.feedback || {
+              id: result.feedbackId || `local-${Date.now()}`,
+              name: payload.name || "Anonimo",
+              rating: payload.rating,
+              message: payload.message,
+              createdAt: new Date().toISOString(),
+              canDelete: Boolean(getToken()),
+            },
+          );
           state.feedbackSubmitted = true;
           render();
+          refreshFeedbackList();
         } catch (error) {
           setFormError(form, getErrorMessage(error, "Não foi possível enviar o feedback"));
           button.disabled = false;
         }
       });
     }
+  }
+
+  function bindFeedbackListActions() {
+    app.querySelectorAll('[data-action="delete-feedback"]').forEach((button) => {
+      button.addEventListener("click", async () => {
+        const feedbackId = button.dataset.id;
+        if (!feedbackId || !confirm("Excluir este feedback?")) return;
+
+        const previousFeedbacks = state.feedbacks.items;
+        state.feedbacks.deletingId = feedbackId;
+        state.feedbacks.error = "";
+        state.feedbacks.items = previousFeedbacks.filter((feedback) => String(feedback.id) !== String(feedbackId));
+        updateFeedbackListRegion();
+        try {
+          await apiRequest(`/api/feedbacks/${encodeURIComponent(feedbackId)}`, { method: "DELETE" });
+          await loadFeedbacks(true, { silent: true });
+        } catch (error) {
+          state.feedbacks.items = previousFeedbacks;
+          state.feedbacks.error = getErrorMessage(error, "Não foi possível excluir o feedback");
+        } finally {
+          state.feedbacks.deletingId = null;
+          updateFeedbackListRegion();
+        }
+      });
+    });
   }
 
   function bindModalClose() {
@@ -3837,6 +4018,10 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
 
   window.addEventListener("popstate", render);
   window.addEventListener("hashchange", render);
+  window.addEventListener("focus", refreshFeedbackList);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) refreshFeedbackList();
+  });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && (state.planModal || state.calendarModal || state.chatSidebarOpen)) {
       state.planModal = null;
