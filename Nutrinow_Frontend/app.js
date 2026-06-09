@@ -671,7 +671,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
             <div>
               <span class="badge">${icon("lock")} Conta Free</span>
               <h2 id="premium-modal-title">${escapeHtml(titleByPath[path] || "Recurso premium")}</h2>
-              <p class="text-muted" style="margin-top:.45rem;line-height:1.55;">Esse recurso faz parte do plano premium. Sua conta free continua com acesso ao Chat NutriAI, perfil, login, cadastro, feedbacks e paginas legais.</p>
+              <p class="text-muted" style="margin-top:.45rem;line-height:1.55;">Esse recurso é liberado apenas no plano premium.</p>
             </div>
           </div>
           ${error ? `<div class="alert premium-modal-error">${icon("alert")} ${escapeHtml(error)}</div>` : ""}
