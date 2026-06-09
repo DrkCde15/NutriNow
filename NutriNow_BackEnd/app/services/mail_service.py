@@ -6,6 +6,12 @@ from email.mime.multipart import MIMEMultipart
 
 logger = logging.getLogger(__name__)
 
+def _smtp_timeout_seconds():
+    try:
+        return max(1, int(os.getenv("SMTP_TIMEOUT_SECONDS", "8")))
+    except (TypeError, ValueError):
+        return 8
+
 def envoyer_email(destinatario, assunto, mensagem_html):
     remetente = (os.getenv("EMAIL_SENDER") or "").strip().strip('"').strip("'")
     senha = (os.getenv("EMAIL_PASSWORD") or "").strip().strip('"').strip("'")
@@ -22,7 +28,7 @@ def envoyer_email(destinatario, assunto, mensagem_html):
     msg.attach(MIMEText(mensagem_html, "html"))
 
     try:
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=_smtp_timeout_seconds()) as server:
             server.starttls()
             server.login(remetente, senha)
             server.sendmail(remetente, destinatario, msg.as_string())

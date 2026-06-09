@@ -1,12 +1,9 @@
 import logging
-import os
 from datetime import datetime, timezone
-from html import escape
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
 from app.database import get_db
 from app.security import check_rate_limit, rate_limit_response
-from app.services.mail_service import envoyer_email
 from app.services.schema_cache import ensure_feedbacks_columns
 
 logger = logging.getLogger(__name__)
@@ -30,31 +27,6 @@ CREATE TABLE IF NOT EXISTS feedbacks (
     CONSTRAINT chk_feedbacks_rating CHECK (rating BETWEEN 1 AND 5)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 """
-
-def _notify_feedback_email(feedback_id, author_name, author_email, rating, message):
-    recipient = (os.getenv("EMAIL_SENDER") or "").strip()
-    if not recipient:
-        logger.error("Destino de notificacao de feedback nao configurado")
-        return False
-
-    safe_name = escape(author_name or "Anonimo")
-    safe_email = escape(author_email or "Nao informado")
-    safe_message = escape(message).replace("\n", "<br>")
-
-    subject = f"Novo feedback recebido - NutriNow (#{feedback_id})"
-    html_body = f"""
-    <html>
-      <body>
-        <h2>Novo feedback recebido</h2>
-        <p><strong>ID:</strong> {feedback_id}</p>
-        <p><strong>Nome:</strong> {safe_name}</p>
-        <p><strong>Email:</strong> {safe_email}</p>
-        <p><strong>Nota:</strong> {rating}/5</p>
-        <p><strong>Comentario:</strong><br>{safe_message}</p>
-      </body>
-    </html>
-    """
-    return envoyer_email(recipient, subject, html_body)
 
 def _ensure_feedbacks_table(cursor):
     global _feedbacks_table_ready
@@ -171,20 +143,16 @@ def create_feedback():
     if len(name) > 120:
         return jsonify({"error": "O nome deve ter no maximo 120 caracteres"}), 400
 
-    user_id = None
-    user_name = None
-    user_email = None
-
     user_id = _optional_user_id()
+    user_name = None
 
     try:
         with get_db() as (cursor, conn):
             _ensure_feedbacks_table(cursor)
             if user_id is not None:
-                cursor.execute("SELECT nome, email FROM usuarios WHERE id=%s", (user_id,))
+                cursor.execute("SELECT nome FROM usuarios WHERE id=%s", (user_id,))
                 user = cursor.fetchone() or {}
                 user_name = user.get("nome")
-                user_email = user.get("email")
 
             author_name = name or user_name or "Anonimo"
 
@@ -193,7 +161,7 @@ def create_feedback():
                 INSERT INTO feedbacks (user_id, nome, email, rating, message)
                 VALUES (%s, %s, %s, %s, %s)
                 """,
-                (user_id, author_name, user_email, rating, message),
+                (user_id, author_name, None, rating, message),
             )
             feedback_id = cursor.lastrowid
             conn.commit()
@@ -208,9 +176,6 @@ def create_feedback():
                 },
                 user_id,
             )
-
-            if not _notify_feedback_email(feedback_id, author_name, user_email, rating, message):
-                logger.error("Feedback %s salvo, mas a notificacao por email falhou", feedback_id)
 
             return (
                 jsonify(

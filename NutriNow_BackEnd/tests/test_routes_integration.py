@@ -72,7 +72,7 @@ class FeedbackFakeCursor:
             self._next_rows = [{"column_name": column} for column in self.columns]
         elif normalized.startswith("ALTER TABLE feedbacks ADD COLUMN"):
             self.columns.add(normalized.split(" ADD COLUMN ", 1)[1].split(" ", 1)[0])
-        elif normalized.startswith("SELECT nome, email FROM usuarios"):
+        elif normalized.startswith("SELECT nome FROM usuarios"):
             self._next_result = self.user
         elif normalized.startswith("SELECT id, user_id, nome, rating, message, created_at FROM feedbacks"):
             self._next_rows = self.feedback_rows
@@ -184,11 +184,7 @@ class RouteIntegrationTest(unittest.TestCase):
 
         with patch("app.routes.feedbacks.get_db", return_value=FakeDb(cursor, conn)), patch(
             "app.routes.feedbacks.check_rate_limit", return_value=(True, None)
-        ), patch.dict(os.environ, {"EMAIL_SENDER": "owner@example.com"}), patch(
-            "app.routes.feedbacks.envoyer_email", return_value=True
-        ), patch(
-            "app.routes.feedbacks._feedbacks_table_ready", False
-        ):
+        ), patch("app.routes.feedbacks._feedbacks_table_ready", False):
             response = app.test_client().post(
                 "/api/feedbacks",
                 json={
@@ -215,8 +211,6 @@ class RouteIntegrationTest(unittest.TestCase):
 
         with patch("app.routes.feedbacks.get_db", return_value=FakeDb(cursor, conn)), patch(
             "app.routes.feedbacks.check_rate_limit", return_value=(True, None)
-        ), patch.dict(os.environ, {"EMAIL_SENDER": "owner@example.com"}), patch(
-            "app.routes.feedbacks.envoyer_email", return_value=True
         ), patch("app.routes.feedbacks._feedbacks_table_ready", False):
             response = app.test_client().post(
                 "/api/feedbacks",
