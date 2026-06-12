@@ -4,6 +4,8 @@ from threading import Lock
 
 TABLE_NAME_RE = re.compile(r"^[A-Za-z0-9_]+$")
 SCHEMA_CACHE_SECONDS = 10 * 60
+USER_ROLE_ENUM_SQL = "ENUM('user','nutritionist','personal_trainer')"
+USER_ROLE_ENUM_VALUES = ("user", "nutritionist", "personal_trainer")
 DIETA_TREINO_SCHEDULE_COLUMNS = {
     "duration_minutes": "ALTER TABLE dieta_treino ADD COLUMN duration_minutes INT NOT NULL DEFAULT 60",
     "recurrence_type": "ALTER TABLE dieta_treino ADD COLUMN recurrence_type VARCHAR(20) NOT NULL DEFAULT 'none'",
@@ -13,6 +15,7 @@ DIETA_TREINO_SCHEDULE_COLUMNS = {
 USUARIO_ACCESS_COLUMNS = {
     "is_premium": "ALTER TABLE usuarios ADD COLUMN is_premium TINYINT(1) NOT NULL DEFAULT 0",
     "premium_expires_at": "ALTER TABLE usuarios ADD COLUMN premium_expires_at DATETIME NULL",
+    "role": f"ALTER TABLE usuarios ADD COLUMN role {USER_ROLE_ENUM_SQL} NOT NULL DEFAULT 'user'",
 }
 FEEDBACKS_COLUMNS = {
     "user_id": "ALTER TABLE feedbacks ADD COLUMN user_id INT NULL",
@@ -28,6 +31,10 @@ _cache_lock = Lock()
 
 def _normalize_column_name(row):
     return row.get("column_name") or row.get("COLUMN_NAME")
+
+
+def _row_value(row, key):
+    return row.get(key) or row.get(key.upper())
 
 def get_table_columns(cursor, table_name):
     if not TABLE_NAME_RE.match(table_name or ""):
@@ -63,6 +70,24 @@ def invalidate_table_columns(table_name):
     with _cache_lock:
         _table_columns_cache.pop(table_name, None)
 
+
+def get_table_column_metadata(cursor, table_name, column_name):
+    if not TABLE_NAME_RE.match(table_name or ""):
+        raise ValueError("Nome de tabela invalido")
+
+    cursor.execute(
+        """
+        SELECT column_type, column_default, is_nullable
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = %s
+          AND column_name = %s
+        LIMIT 1
+        """,
+        (table_name, column_name),
+    )
+    return cursor.fetchone()
+
 def resolve_dieta_user_column(cursor):
     columns = get_table_columns(cursor, "dieta_treino")
     if "user_id" in columns:
@@ -94,12 +119,36 @@ def ensure_usuario_access_columns(cursor):
         for column in USUARIO_ACCESS_COLUMNS
         if column not in columns
     ]
-    if not missing_columns:
+    if missing_columns:
+        for column in missing_columns:
+            cursor.execute(USUARIO_ACCESS_COLUMNS[column])
+
+        invalidate_table_columns("usuarios")
+
+    ensure_usuario_role_enum(cursor)
+
+
+def ensure_usuario_role_enum(cursor):
+    metadata = get_table_column_metadata(cursor, "usuarios", "role")
+    if not metadata:
         return
 
-    for column in missing_columns:
-        cursor.execute(USUARIO_ACCESS_COLUMNS[column])
+    column_type = str(_row_value(metadata, "column_type") or "").lower().replace(" ", "")
+    column_default = str(_row_value(metadata, "column_default") or "")
+    expected_type = USER_ROLE_ENUM_SQL.lower().replace(" ", "")
+    if column_type == expected_type and column_default == "user":
+        return
 
+    placeholders = ", ".join(["%s"] * len(USER_ROLE_ENUM_VALUES))
+    cursor.execute(
+        f"""
+        UPDATE usuarios
+        SET role='user'
+        WHERE role IS NULL OR role NOT IN ({placeholders})
+        """,
+        USER_ROLE_ENUM_VALUES,
+    )
+    cursor.execute(f"ALTER TABLE usuarios MODIFY COLUMN role {USER_ROLE_ENUM_SQL} NOT NULL DEFAULT 'user'")
     invalidate_table_columns("usuarios")
 
 

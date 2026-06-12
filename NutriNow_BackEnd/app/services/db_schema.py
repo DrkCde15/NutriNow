@@ -13,6 +13,7 @@ CORE_SCHEMA_SQL = [
         senha VARCHAR(255) NOT NULL,
         is_premium TINYINT(1) NOT NULL DEFAULT 0,
         premium_expires_at DATETIME NULL,
+        role ENUM('user','nutritionist','personal_trainer') NOT NULL DEFAULT 'user',
         criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_usuarios_email (email),
         INDEX idx_usuarios_premium (is_premium, premium_expires_at)
@@ -155,10 +156,86 @@ CORE_SCHEMA_SQL = [
             FOREIGN KEY (user_id) REFERENCES usuarios(id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     """,
+    """
+    CREATE TABLE IF NOT EXISTS pacientes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        professional_id INT NOT NULL,
+        nome VARCHAR(255) NOT NULL,
+        idade INT NULL,
+        peso DECIMAL(5,2) NULL,
+        altura DECIMAL(5,2) NULL,
+        objetivo VARCHAR(255) NULL,
+        observacoes TEXT NULL,
+        criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_pacientes_professional (professional_id),
+        CONSTRAINT fk_pacientes_professional
+            FOREIGN KEY (professional_id) REFERENCES usuarios(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS paciente_anotacoes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        patient_id INT NOT NULL,
+        professional_id INT NOT NULL,
+        categoria VARCHAR(100) NULL,
+        content TEXT NOT NULL,
+        criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_anotacoes_patient (patient_id),
+        INDEX idx_anotacoes_professional (professional_id),
+        CONSTRAINT fk_anotacoes_patient
+            FOREIGN KEY (patient_id) REFERENCES pacientes(id) ON DELETE CASCADE,
+        CONSTRAINT fk_anotacoes_professional
+            FOREIGN KEY (professional_id) REFERENCES usuarios(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS paciente_dietas (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        patient_id INT NOT NULL,
+        professional_id INT NOT NULL,
+        titulo VARCHAR(255) NOT NULL,
+        calorias INT NULL,
+        proteinas INT NULL,
+        carboidratos INT NULL,
+        gorduras INT NULL,
+        refeicoes JSON NULL,
+        observacoes TEXT NULL,
+        criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_dietas_patient (patient_id),
+        CONSTRAINT fk_dietas_patient
+            FOREIGN KEY (patient_id) REFERENCES pacientes(id) ON DELETE CASCADE,
+        CONSTRAINT fk_dietas_professional
+            FOREIGN KEY (professional_id) REFERENCES usuarios(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS paciente_treinos (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        patient_id INT NOT NULL,
+        professional_id INT NOT NULL,
+        titulo VARCHAR(255) NOT NULL,
+        grupo_muscular VARCHAR(255) NULL,
+        exercicios JSON NULL,
+        observacoes TEXT NULL,
+        criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_treinos_patient (patient_id),
+        CONSTRAINT fk_treinos_patient
+            FOREIGN KEY (patient_id) REFERENCES pacientes(id) ON DELETE CASCADE,
+        CONSTRAINT fk_treinos_professional
+            FOREIGN KEY (professional_id) REFERENCES usuarios(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """,
 ]
+
+PROFESSIONAL_SCHEMA_SQL = CORE_SCHEMA_SQL[-4:]
 
 def ensure_core_schema(cursor):
     for statement in CORE_SCHEMA_SQL:
         cursor.execute(statement)
     ensure_usuario_access_columns(cursor)
     ensure_feedbacks_columns(cursor)
+
+
+def ensure_professional_schema(cursor):
+    for statement in PROFESSIONAL_SCHEMA_SQL:
+        cursor.execute(statement)

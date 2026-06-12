@@ -35,7 +35,7 @@ from app.security import (
     validate_password,
 )
 from app.services.agent_service import clear_user_agents
-from app.services.access_control import account_is_premium, account_plan
+from app.services.access_control import account_is_premium, account_plan, normalize_role
 from app.services.account_cache import get_cached_account, set_cached_account
 from app.services.mail_service import envoyer_email
 from app.services.schema_cache import ensure_usuario_access_columns
@@ -175,13 +175,14 @@ def _account_payload(user):
         "premium": is_premium,
         "plan": account_plan(user),
         "premium_expires_at": _serialize_datetime(user.get("premium_expires_at")),
+        "role": normalize_role(user.get("role")),
     }
 
 def _refresh_cookie_max_age():
     return int(os.getenv("JWT_REFRESH_TOKEN_DAYS", "30")) * 24 * 60 * 60
 
-def _set_refresh_cookie(response, user_id):
-    refresh_token = create_refresh_token(identity=str(user_id))
+def _set_refresh_cookie(response, user_id, role="user"):
+    refresh_token = create_refresh_token(identity=str(user_id), additional_claims={"role": normalize_role(role)})
     set_refresh_cookies(response, refresh_token, max_age=_refresh_cookie_max_age())
     return response
 
@@ -194,7 +195,7 @@ def _account_by_id(user_id):
         ensure_usuario_access_columns(cursor)
         cursor.execute(
             """
-            SELECT u.id, u.nome, u.email, u.is_premium, u.premium_expires_at, p.altura, p.peso
+            SELECT u.id, u.nome, u.email, u.is_premium, u.premium_expires_at, u.role, p.altura, p.peso
             FROM usuarios u
             LEFT JOIN perfil p ON u.id = p.usuario_id
             WHERE u.id=%s
@@ -213,7 +214,7 @@ def _account_by_id(user_id):
 
 def _auth_response(user, message="Login realizado com sucesso!"):
     account = _account_payload(user)
-    access_token = create_access_token(identity=str(account["id"]))
+    access_token = create_access_token(identity=str(account["id"]), additional_claims={"role": account["role"]})
     set_cached_account(account["id"], account)
     response = jsonify(
         {
@@ -222,7 +223,7 @@ def _auth_response(user, message="Login realizado com sucesso!"):
             "user": account,
         }
     )
-    _set_refresh_cookie(response, account["id"])
+    _set_refresh_cookie(response, account["id"], account["role"])
     return response
 
 @auth_bp.route("/cadastro", methods=["POST", "OPTIONS"])
@@ -241,6 +242,7 @@ def cadastro():
     altura = data.get("altura")
     peso = data.get("peso")
     ja_treinou = data.get("ja_treinou", "Nunca treinou")
+    role = normalize_role(data.get("role"))
 
     if not all([nome, sobrenome, email, senha]):
         return jsonify({"error": "Campos obrigatorios ausentes"}), 400
@@ -259,10 +261,10 @@ def cadastro():
             ensure_usuario_access_columns(cursor)
             cursor.execute(
                 """
-                INSERT INTO usuarios (nome, sobrenome, data_nascimento, genero, email, senha)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO usuarios (nome, sobrenome, data_nascimento, genero, email, senha, role)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """,
-                (nome, sobrenome, data_nascimento, genero, email, senha_hash),
+                (nome, sobrenome, data_nascimento, genero, email, senha_hash, role),
             )
 
             user_id = cursor.lastrowid
@@ -284,6 +286,7 @@ def cadastro():
             "peso": peso,
             "is_premium": 0,
             "premium_expires_at": None,
+            "role": role,
         }
         return _auth_response(user, "Conta criada com sucesso!"), 201
     except IntegrityError as exc:
@@ -315,7 +318,7 @@ def login():
             ensure_usuario_access_columns(cursor)
             cursor.execute(
                 """
-                SELECT u.id, u.nome, u.email, u.senha, u.is_premium, u.premium_expires_at, p.altura, p.peso
+                SELECT u.id, u.nome, u.email, u.senha, u.is_premium, u.premium_expires_at, u.role, p.altura, p.peso
                 FROM usuarios u
                 LEFT JOIN perfil p ON u.id = p.usuario_id
                 WHERE u.email=%s
@@ -478,7 +481,7 @@ def exchange_google_auth_code():
             ensure_usuario_access_columns(cursor)
             cursor.execute(
                 """
-                SELECT u.id, u.nome, u.email, u.is_premium, u.premium_expires_at, p.altura, p.peso
+                SELECT u.id, u.nome, u.email, u.is_premium, u.premium_expires_at, u.role, p.altura, p.peso
                 FROM usuarios u
                 LEFT JOIN perfil p ON u.id = p.usuario_id
                 WHERE u.id=%s
@@ -525,7 +528,7 @@ def refresh_session():
         unset_jwt_cookies(response)
         return response, 404
 
-    access_token = create_access_token(identity=str(account["id"]))
+    access_token = create_access_token(identity=str(account["id"]), additional_claims={"role": account["role"]})
     response = jsonify(
         {
             "message": "Sessao renovada com sucesso!",
@@ -533,7 +536,7 @@ def refresh_session():
             "user": account,
         }
     )
-    _set_refresh_cookie(response, account["id"])
+    _set_refresh_cookie(response, account["id"], account["role"])
     return response, 200
 
 @auth_bp.route("/me", methods=["GET"])

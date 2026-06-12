@@ -55,6 +55,17 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     googleStatus: { loaded: false, loading: false, data: null, error: "" },
     chatSessions: { loaded: false, loading: false, items: null, error: "" },
     chatHistory: {},
+    patients: { items: [], loading: false, loaded: false, error: "", search: "" },
+    selectedPatient: null,
+    patientNotes: { items: [], loading: false, error: "" },
+    patientDiet: { data: null, loading: false, error: "" },
+    patientWorkout: { data: null, loading: false, error: "" },
+    patientModalOpen: false,
+    editingPatient: null,
+    noteModalOpen: false,
+    editingNote: null,
+    professionalMessage: "",
+    professionalError: "",
   };
 
   const PREMIUM_ROUTES = new Set(["/dashboard", "/planos", "/calendario"]);
@@ -259,6 +270,17 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     state.chatHistory = {};
     state.chatCalendarMessage = "";
     state.chatCalendarError = "";
+    state.patients = { items: [], loading: false, loaded: false, error: "", search: "" };
+    state.selectedPatient = null;
+    state.patientNotes = { items: [], loading: false, error: "" };
+    state.patientDiet = { data: null, loading: false, error: "" };
+    state.patientWorkout = { data: null, loading: false, error: "" };
+    state.patientModalOpen = false;
+    state.editingPatient = null;
+    state.noteModalOpen = false;
+    state.editingNote = null;
+    state.professionalMessage = "";
+    state.professionalError = "";
   }
 
   function getErrorMessage(error, fallback = "Erro ao comunicar com o backend") {
@@ -425,6 +447,20 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     return getToken() ? user : null;
   }
 
+  function isProfessionalUser(user = getUser()) {
+    return user?.role === "nutritionist" || user?.role === "personal_trainer";
+  }
+
+  function roleLabel(role) {
+    if (role === "nutritionist") return "Nutricionista";
+    if (role === "personal_trainer") return "Personal Trainer";
+    return "Usuario comum";
+  }
+
+  function professionalSpecialtyLabel(role) {
+    return role === "nutritionist" ? "Dietas, refeições e macros" : "Treinos, séries e grupos musculares";
+  }
+
   function isPremiumUser(user = getUser()) {
     return Boolean(user?.is_premium || user?.premium || user?.plan === "premium");
   }
@@ -510,6 +546,10 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     state.planModal = null;
     state.calendarModal = null;
     state.chatSidebarOpen = false;
+    state.patientModalOpen = false;
+    state.editingPatient = null;
+    state.noteModalOpen = false;
+    state.editingNote = null;
     if (location.protocol.startsWith("http")) {
       const updateHistory = replace ? history.replaceState.bind(history) : history.pushState.bind(history);
       updateHistory({}, "", path || "/");
@@ -545,6 +585,9 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
       "/termos",
       "/privacidade",
       "/lgpd",
+      "/pacientes",
+      "/anotacoes",
+      "/paciente-detalhe",
     ]);
     return valid.has(path) ? path : "/";
   }
@@ -565,8 +608,11 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
 
   function accountActionsMarkup(active, user) {
     const premium = isPremiumUser(user);
+    const pill = isProfessionalUser(user)
+      ? `<span class="plan-pill pro">${escapeHtml(roleLabel(user.role))}</span>`
+      : `<span class="plan-pill ${premium ? "premium" : "free"}">${premiumLabel(user)}</span>`;
     return `
-      <span class="plan-pill ${premium ? "premium" : "free"}">${premiumLabel(user)}</span>
+      ${pill}
       <a href="/perfil" data-link class="btn btn-ghost ${active === "/perfil" ? "active" : ""}">
         ${icon("user")} ${escapeHtml(getFirstName(user))}
       </a>
@@ -576,8 +622,11 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
 
   function mobileAccountActionsMarkup(user) {
     const premium = isPremiumUser(user);
+    const pill = isProfessionalUser(user)
+      ? `<span class="plan-pill pro">${escapeHtml(roleLabel(user.role))}</span>`
+      : `<span class="plan-pill ${premium ? "premium" : "free"}">${premiumLabel(user)}</span>`;
     return `
-      <span class="plan-pill ${premium ? "premium" : "free"}">${premiumLabel(user)}</span>
+      ${pill}
       <a href="/perfil" data-link class="btn btn-secondary">${icon("user")} Perfil (${escapeHtml(getFirstName(user))})</a>
       <button class="btn btn-secondary" data-action="logout">${icon("logout")} Sair</button>
     `;
@@ -585,14 +634,23 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
 
   function headerMarkup(active = "") {
     const user = getUser();
-    let privateLinks = user
-      ? [
+    let privateLinks = [];
+    if (user) {
+      if (isProfessionalUser(user)) {
+        privateLinks = [
+          ["/pacientes", "Pacientes"],
+          ["/anotacoes", "Anotações"],
+          ["/chat", "Chat NutriAI"],
+        ];
+      } else {
+        privateLinks = [
           ["/dashboard", "Dashboard"],
           ["/planos", "Dietas e Treinos"],
           ["/calendario", "Calendário"],
           ["/chat", "Chat NutriAI"],
-        ]
-      : [];
+        ];
+      }
+    }
     const navLinks = privateLinks
       .map(
         ([to, label]) =>
@@ -1119,6 +1177,43 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
         </div>
         ${fieldMarkup("Email", "email", "email", { icon: "mail", placeholder: "Email", autocomplete: "email" })}
         ${fieldMarkup("Senha", "senha", "password", { icon: "lock", placeholder: "Senha", autocomplete: "new-password", passwordStrength: "Mínimo de 10 caracteres" })}
+        
+        <div class="role-selector-container">
+          <span class="form-label" style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Você é um profissional da saúde?</span>
+          <div class="role-cards-grid">
+            <label class="role-card">
+              <input type="radio" name="role" value="user" checked>
+              <div class="role-card-inner">
+                <span class="role-card-icon">${icon("user")}</span>
+                <div class="role-card-text">
+                  <strong>Não</strong>
+                  <span>Usuário comum</span>
+                </div>
+              </div>
+            </label>
+            <label class="role-card">
+              <input type="radio" name="role" value="nutritionist">
+              <div class="role-card-inner">
+                <span class="role-card-icon">${icon("leaf")}</span>
+                <div class="role-card-text">
+                  <strong>Nutricionista</strong>
+                  <span>Prescrever dietas</span>
+                </div>
+              </div>
+            </label>
+            <label class="role-card">
+              <input type="radio" name="role" value="personal_trainer">
+              <div class="role-card-inner">
+                <span class="role-card-icon">${icon("dumbbell")}</span>
+                <div class="role-card-text">
+                  <strong>Personal Trainer</strong>
+                  <span>Prescrever treinos</span>
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
+
         <div class="grid-2">
           ${fieldMarkup("Meta", "meta", "text", { required: false, placeholder: "Meta", value: "Não definida" })}
           ${selectFieldMarkup("Já treinou?", "jaTreinou", ["Nunca treinou", "Iniciante", "Intermediário", "Avançado"], "Nunca treinou", false)}
@@ -2878,6 +2973,18 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
       routeTo("/chat", true);
       return;
     }
+    if (user && isProfessionalUser(user)) {
+      if (path === "/dashboard" || path === "/planos" || path === "/calendario") {
+        routeTo("/pacientes", true);
+        return;
+      }
+    }
+    if (user && user.role === "user") {
+      if (path === "/pacientes" || path === "/anotacoes" || path === "/paciente-detalhe") {
+        routeTo("/dashboard", true);
+        return;
+      }
+    }
     state.recoverySent = path === "/esqueci-senha" ? state.recoverySent : false;
     state.resetDone = path === "/reset-senha" ? state.resetDone : false;
     const titles = {
@@ -2897,6 +3004,9 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
       "/termos": "Termos de Uso - NutriNow",
       "/privacidade": "Política de Privacidade - NutriNow",
       "/lgpd": "LGPD - NutriNow",
+      "/pacientes": "Pacientes - NutriNow Pro",
+      "/anotacoes": "Anotações - NutriNow Pro",
+      "/paciente-detalhe": "Prontuário - NutriNow Pro",
     };
     document.title = titles[path] || titles["/"];
     const pages = {
@@ -2916,6 +3026,9 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
       "/termos": () => legalPage("termos"),
       "/privacidade": () => legalPage("privacidade"),
       "/lgpd": () => legalPage("lgpd"),
+      "/pacientes": pacientesPage,
+      "/anotacoes": anotacoesPage,
+      "/paciente-detalhe": pacienteDetalhePage,
     };
     const pageRenderer = pages[path];
     app.innerHTML = `${pageRenderer()}${premiumUpgradeModalMarkup()}${analyticsConsentMarkup()}`;
@@ -2995,6 +3108,12 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     }
 
     if (!getToken()) return;
+    if (path === "/pacientes" || path === "/anotacoes") {
+      loadPatients();
+    }
+    if ((path === "/paciente-detalhe" || path === "/anotacoes") && state.selectedPatient) {
+      loadPatientDetails(state.selectedPatient.id);
+    }
     if (isPremiumRoute(path) && !isPremiumUser()) return;
 
     if (path === "/dashboard" && !state.dashboard.loaded && !state.dashboard.loading) {
@@ -3080,6 +3199,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     bindAnalyticsConsent();
     bindPremiumModal();
     bindModalClose();
+    bindProfessional();
   }
 
   function bindPaymentReturn() {
@@ -3247,6 +3367,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
               altura: Number(data.get("altura")) || undefined,
               peso: Number(data.get("peso")) || undefined,
               ja_treinou: String(data.get("jaTreinou") || "Nunca treinou"),
+              role: String(data.get("role") || "user"),
             }),
             token: "",
           });
@@ -4054,6 +4175,809 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
       // Mantem a sessao local se o backend estiver temporariamente indisponivel.
       return null;
     }
+  }
+
+  migratePersistentSession();
+  render();
+  bootstrapPersistentSession();
+  syncAccountSnapshot();
+
+  function pacientesPage() {
+    const user = getUser();
+    if (!user) return loginPage();
+    if (user.role === "user") {
+      routeTo("/dashboard", true);
+      return "";
+    }
+
+    const roleName = user.role === "nutritionist" ? "Nutricionista" : "Personal Trainer";
+    const patientList = state.patients.items;
+    const totalPatients = patientList.length;
+
+    let patientsHtml = "";
+    if (state.patients.loading) {
+      patientsHtml = `
+        <div class="loading-state" style="text-align:center;padding:3rem;">
+          <div class="spinner"></div>
+          <p class="text-muted" style="margin-top:1rem;">Carregando seus pacientes...</p>
+        </div>
+      `;
+    } else if (patientList.length === 0) {
+      patientsHtml = `
+        <div class="empty-state" style="text-align:center;padding:4rem 2rem;background:var(--card-bg);border:1px dashed var(--border-color);border-radius:1rem;">
+          <span class="feature-icon" style="margin:0 auto 1.5rem;">${icon("user")}</span>
+          <h3>Nenhum paciente cadastrado</h3>
+          <p class="text-muted" style="max-width:320px;margin:0.5rem auto 1.5rem;">Cadastre seu primeiro paciente para gerenciar suas dietas, treinos e anotações.</p>
+          <button class="btn btn-primary" data-action="open-patient-modal">${icon("plus")} Cadastrar Paciente</button>
+        </div>
+      `;
+    } else {
+      patientsHtml = `
+        <div class="patients-grid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));gap:1.5rem;">
+          ${patientList.map((p) => `
+            <div class="patient-card card" style="display:flex;flex-direction:column;justify-content:space-between;padding:1.5rem;background:var(--card-bg);border:1px solid var(--border-color);border-radius:1rem;transition:all 0.2s ease;">
+              <div>
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;">
+                  <div>
+                    <h3 style="margin:0;font-size:1.2rem;font-weight:600;">${escapeHtml(p.nome)}</h3>
+                    <span class="badge" style="margin-top:0.25rem;background:color-mix(in oklab,var(--primary),transparent 92%);color:var(--primary);">${p.idade ? `${p.idade} anos` : "Idade não informada"}</span>
+                  </div>
+                  <span class="patient-avatar" style="width:2.5rem;height:2.5rem;border-radius:50%;background:var(--gradient-hero);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:bold;font-size:1rem;">
+                    ${getInitials(p.nome)}
+                  </span>
+                </div>
+                
+                <div class="patient-metrics" style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1.25rem;padding:0.75rem;background:color-mix(in oklab,var(--foreground),transparent 97%);border-radius:0.5rem;font-size:0.85rem;">
+                  <div>
+                    <span class="text-muted" style="display:block;font-size:0.75rem;">Peso</span>
+                    <strong>${p.peso ? `${p.peso} kg` : "--"}</strong>
+                  </div>
+                  <div>
+                    <span class="text-muted" style="display:block;font-size:0.75rem;">Altura</span>
+                    <strong>${p.altura ? `${p.altura} m` : "--"}</strong>
+                  </div>
+                </div>
+
+                <p style="margin-bottom:1rem;font-size:0.9rem;line-height:1.4;"><strong class="text-muted">Objetivo:</strong> ${escapeHtml(p.objetivo || "Não definido")}</p>
+              </div>
+
+              <div class="patient-card-actions" style="display:flex;gap:0.5rem;margin-top:1rem;border-top:1px solid var(--border-color);padding-top:1rem;">
+                <button class="btn btn-primary btn-sm" style="flex:1;" data-action="view-patient" data-id="${p.id}">${icon("eye")} Ver Prontuário</button>
+                <button class="btn btn-secondary btn-sm icon-btn" style="border-color:transparent;color:#ef4444;background:color-mix(in oklab,#ef4444,transparent 95%);" data-action="delete-patient" data-id="${p.id}" title="Excluir paciente">${icon("trash")}</button>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    const modalHtml = state.patientModalOpen ? `
+      <div class="modal-backdrop premium-modal-backdrop" role="presentation" data-action="close-patient-modal-backdrop">
+        <section class="modal-card premium-modal-card" style="max-width:500px;width:100%;margin:2rem auto;background:var(--card-bg);border-radius:1.25rem;overflow:hidden;box-shadow:var(--shadow-lg);" role="dialog" aria-modal="true" data-modal-card>
+          <div class="modal-head" style="padding:1.5rem;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <h2 style="font-size:1.4rem;font-weight:700;margin:0;">Cadastrar Paciente</h2>
+              <p class="text-muted" style="margin:0.25rem 0 0;font-size:0.85rem;">Adicione as informações iniciais do seu paciente.</p>
+            </div>
+            <button class="icon-btn" data-action="close-patient-modal" aria-label="Fechar modal">${icon("x", "icon-lg")}</button>
+          </div>
+          <form class="form" data-form="add-patient" style="padding:1.5rem;display:flex;flex-direction:column;gap:1rem;">
+            ${fieldMarkup("Nome do Paciente", "nome", "text", { placeholder: "Nome completo", required: true })}
+            <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+              ${fieldMarkup("Idade", "idade", "number", { placeholder: "Ex: 28", min: "0" })}
+              ${fieldMarkup("Objetivo", "objetivo", "text", { placeholder: "Ex: Hipertrofia" })}
+            </div>
+            <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+              ${fieldMarkup("Peso (kg)", "peso", "number", { placeholder: "Ex: 75.5", step: "0.1", min: "0" })}
+              ${fieldMarkup("Altura (m)", "altura", "number", { placeholder: "Ex: 1.78", step: "0.01", min: "0" })}
+            </div>
+            <label class="field">
+              <span class="label">Observações Gerais / Histórico</span>
+              <textarea class="form-input" style="height:100px;padding:0.75rem;border-radius:0.5rem;" name="observacoes" placeholder="Restrições médicas, intolerâncias, hábitos cotidianos..."></textarea>
+            </label>
+            <div data-form-error></div>
+            <div style="display:flex;justify-content:flex-end;gap:0.75rem;margin-top:1rem;border-top:1px solid var(--border-color);padding-top:1rem;">
+              <button type="button" class="btn btn-secondary" data-action="close-patient-modal">Cancelar</button>
+              <button type="submit" class="btn btn-primary">${icon("check")} Salvar Cadastro</button>
+            </div>
+          </form>
+        </section>
+      </div>
+    ` : "";
+
+    return pageShell(
+      `
+      <main class="page-main">
+        <div class="container-wide">
+          <section class="dashboard-hero" style="padding:2.5rem 0 1.5rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1.5rem;">
+              <div>
+                <span class="badge" style="background:var(--primary);color:#fff;">${roleName} PRO</span>
+                <h1 style="margin-top:0.75rem;font-size:clamp(1.8rem, 4vw, 2.5rem);font-weight:700;">Gestão de Pacientes</h1>
+                <p class="text-muted" style="margin-top:0.25rem;">Acompanhe o prontuário, anotações, e prescreva planos para seus pacientes.</p>
+              </div>
+              <button class="btn btn-primary" data-action="open-patient-modal">${icon("plus")} Cadastrar Paciente</button>
+            </div>
+          </section>
+
+          <div class="stats-bar card" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:1.5rem;padding:1.5rem;background:var(--card-bg);border:1px solid var(--border-color);border-radius:1rem;margin-bottom:2rem;">
+            <div>
+              <span class="text-muted" style="font-size:0.85rem;">Total de Pacientes</span>
+              <h2 style="font-size:2rem;font-weight:700;margin:0.25rem 0 0;">${totalPatients}</h2>
+            </div>
+            <div>
+              <span class="text-muted" style="font-size:0.85rem;">Especialidade</span>
+              <h2 style="font-size:1.5rem;font-weight:700;margin:0.25rem 0 0;color:var(--primary);">${roleName}</h2>
+            </div>
+          </div>
+
+          <section class="patients-section">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;gap:1rem;flex-wrap:wrap;">
+              <h2 style="font-size:1.4rem;font-weight:600;margin:0;">Lista de Pacientes</h2>
+              <div style="position:relative;width:100%;max-width:320px;">
+                <span style="position:absolute;left:0.75rem;top:50%;transform:translateY(-50%);color:var(--text-muted);">${icon("search")}</span>
+                <input type="text" class="input" style="padding-left:2.5rem;border-radius:0.75rem;margin:0;" placeholder="Pesquisar paciente..." data-patient-search value="${escapeHtml(state.patients.search)}">
+              </div>
+            </div>
+
+            ${state.patients.error ? `<div class="alert alert-error" style="margin-bottom:1.5rem;">${icon("alert")} ${escapeHtml(state.patients.error)}</div>` : ""}
+
+            ${patientsHtml}
+          </section>
+        </div>
+      </main>
+      ${modalHtml}
+      ${footerMarkup()}
+      `,
+      "/pacientes"
+    );
+  }
+
+  function pacienteDetalhePage() {
+    const user = getUser();
+    if (!user) return loginPage();
+    if (user.role === "user") {
+      routeTo("/dashboard", true);
+      return "";
+    }
+    
+    const p = state.selectedPatient;
+    if (!p) {
+      routeTo("/pacientes", true);
+      return "";
+    }
+
+    const isNutri = user.role === "nutritionist";
+    const planTitle = isNutri ? "Plano Alimentar" : "Ficha de Treino";
+
+    let notesHtml = "";
+    if (state.patientNotes.loading) {
+      notesHtml = `<p class="text-muted" style="padding:1rem 0;">Buscando anotações...</p>`;
+    } else if (state.patientNotes.items.length === 0) {
+      notesHtml = `
+        <div style="text-align:center;padding:2rem 1rem;border:1px dashed var(--border-color);border-radius:0.5rem;margin-top:1rem;">
+          <p class="text-muted" style="margin-bottom:1rem;">Nenhuma anotação registrada para este paciente.</p>
+          <button class="btn btn-secondary btn-sm" data-action="open-note-modal">${icon("plus")} Criar Anotação</button>
+        </div>
+      `;
+    } else {
+      notesHtml = `
+        <div class="notes-list" style="display:flex;flex-direction:column;gap:1rem;margin-top:1rem;max-height:500px;overflow-y:auto;padding-right:0.5rem;">
+          ${state.patientNotes.items.map((n) => {
+            const dateStr = n.criado_em ? new Date(n.criado_em).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : "";
+            return `
+              <div class="note-card card" style="padding:1rem;background:var(--card-bg);border:1px solid var(--border-color);border-radius:0.75rem;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                  <span class="badge" style="background:color-mix(in oklab,var(--primary),transparent 92%);color:var(--primary);font-size:0.7rem;text-transform:uppercase;">${escapeHtml(n.categoria || "observações")}</span>
+                  <span style="font-size:0.75rem;color:var(--text-muted);">${dateStr}</span>
+                </div>
+                <p style="font-size:0.9rem;line-height:1.4;white-space:pre-wrap;margin:0 0 0.75rem 0;">${escapeHtml(n.content)}</p>
+                <div style="display:flex;justify-content:flex-end;gap:0.5rem;border-top:1px solid color-mix(in oklab,var(--border-color),transparent 50%);padding-top:0.5rem;">
+                  <button class="btn btn-secondary btn-sm" style="padding:0.2rem 0.5rem;font-size:0.75rem;" data-action="edit-note" data-id="${n.id}">${icon("pencil")} Editar</button>
+                  <button class="btn btn-secondary btn-sm" style="padding:0.2rem 0.5rem;font-size:0.75rem;color:#ef4444;" data-action="delete-note" data-id="${n.id}">${icon("trash")} Excluir</button>
+                </div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+    }
+
+    let planHtml = "";
+    if (isNutri) {
+      const diet = state.patientDiet.data || {};
+      const meals = diet.refeicoes || [
+        { nome: "Café da Manhã", horario: "08:00", itens: "2 ovos cozidos, 1 xícara de café" },
+        { nome: "Almoço", horario: "12:00", itens: "150g de frango grelhado, 100g de arroz integral, salada" },
+        { nome: "Jantar", horario: "19:00", itens: "150g de peixe, legumes no vapor" }
+      ];
+
+      planHtml = `
+        <form class="form" data-form="save-diet" style="display:flex;flex-direction:column;gap:1.25rem;">
+          <h3 style="margin:0 0 0.25rem;font-size:1.2rem;font-weight:600;">Prescrição Alimentar</h3>
+          
+          ${fieldMarkup("Título do Plano", "diet_titulo", "text", { value: diet.titulo || "Plano Alimentar Padrão", required: true })}
+          
+          <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:0.75rem;">
+            ${fieldMarkup("Kcal", "diet_calorias", "number", { value: diet.calorias || "", placeholder: "Ex: 2000" })}
+            ${fieldMarkup("Prot (g)", "diet_proteinas", "number", { value: diet.proteinas || "", placeholder: "Ex: 140" })}
+            ${fieldMarkup("Carbo (g)", "diet_carboidratos", "number", { value: diet.carboidratos || "", placeholder: "Ex: 200" })}
+            ${fieldMarkup("Gord (g)", "diet_gorduras", "number", { value: diet.gorduras || "", placeholder: "Ex: 60" })}
+          </div>
+
+          <div style="border-top:1px solid var(--border-color);padding-top:1rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+              <h4 style="margin:0;font-size:1rem;font-weight:600;">Refeições</h4>
+              <button type="button" class="btn btn-secondary btn-sm" data-action="add-meal-row">${icon("plus")} Nova Refeição</button>
+            </div>
+            
+            <div class="meals-container" style="display:flex;flex-direction:column;gap:1rem;">
+              ${meals.map((m, index) => `
+                <div class="meal-row card" data-meal-index="${index}" style="padding:1rem;background:color-mix(in oklab,var(--card-bg),transparent 40%);border:1px solid var(--border-color);border-radius:0.75rem;position:relative;">
+                  <button type="button" class="icon-btn" style="position:absolute;top:0.5rem;right:0.5rem;color:#ef4444;" data-action="remove-meal-row" data-index="${index}" title="Remover refeição">${icon("x")}</button>
+                  <div style="display:grid;grid-template-columns:2fr 1fr;gap:0.75rem;margin-bottom:0.75rem;">
+                    <div>
+                      <span class="text-muted" style="font-size:0.75rem;font-weight:500;">Nome da Refeição</span>
+                      <input type="text" class="input input-sm" style="margin:0.25rem 0 0;" name="meal_nome_${index}" value="${escapeHtml(m.nome)}" required placeholder="Ex: Café da Manhã">
+                    </div>
+                    <div>
+                      <span class="text-muted" style="font-size:0.75rem;font-weight:500;">Horário</span>
+                      <input type="text" class="input input-sm" style="margin:0.25rem 0 0;" name="meal_horario_${index}" value="${escapeHtml(m.horario)}" placeholder="Ex: 08:00">
+                    </div>
+                  </div>
+                  <div>
+                    <span class="text-muted" style="font-size:0.75rem;font-weight:500;">Alimentos / Itens</span>
+                    <textarea class="form-input" style="margin:0.25rem 0 0;height:60px;width:100%;border-radius:0.375rem;padding:0.5rem;" name="meal_itens_${index}" required placeholder="Ex: 2 ovos, 1 banana, 30g aveia">${escapeHtml(m.itens)}</textarea>
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+
+          <div style="border-top:1px solid var(--border-color);padding-top:1rem;">
+            <label class="field">
+              <span class="label">Observações e Orientações Adicionais</span>
+              <textarea class="form-input" style="height:80px;width:100%;border-radius:0.5rem;padding:0.5rem;" name="diet_observacoes" placeholder="Orientações de consumo de água, suplementação, etc.">${escapeHtml(diet.observacoes || "")}</textarea>
+            </label>
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="margin-top:1rem;">${icon("save")} Salvar Plano Alimentar</button>
+        </form>
+      `;
+    } else {
+      const workout = state.patientWorkout.data || {};
+      const exercises = workout.exercicios || [
+        { nome: "Supino Reto", series: "4", repeticoes: "10", carga: "25kg de cada lado", obs: "Controlar a descida" },
+        { nome: "Crucifixo Inclinado", series: "3", repeticoes: "12", carga: "16kg cada halter", obs: "" }
+      ];
+
+      planHtml = `
+        <form class="form" data-form="save-workout" style="display:flex;flex-direction:column;gap:1.25rem;">
+          <h3 style="margin:0 0 0.25rem;font-size:1.2rem;font-weight:600;">Ficha de Treinamento</h3>
+          
+          <div class="grid-2" style="display:grid;grid-template-columns:2fr 1fr;gap:0.75rem;">
+            ${fieldMarkup("Título da Ficha", "workout_titulo", "text", { value: workout.titulo || "Ficha A - Hipertrofia", required: true })}
+            ${fieldMarkup("Grupo Muscular", "workout_grupo_muscular", "text", { value: workout.grupo_muscular || "Peitoral/Tríceps", placeholder: "Ex: Costas" })}
+          </div>
+
+          <div style="border-top:1px solid var(--border-color);padding-top:1rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+              <h4 style="margin:0;font-size:1rem;font-weight:600;">Exercícios</h4>
+              <button type="button" class="btn btn-secondary btn-sm" data-action="add-exercise-row">${icon("plus")} Novo Exercício</button>
+            </div>
+            
+            <div class="exercises-container" style="display:flex;flex-direction:column;gap:1rem;">
+              ${exercises.map((e, index) => `
+                <div class="exercise-row card" data-exercise-index="${index}" style="padding:1rem;background:color-mix(in oklab,var(--card-bg),transparent 40%);border:1px solid var(--border-color);border-radius:0.75rem;position:relative;">
+                  <button type="button" class="icon-btn" style="position:absolute;top:0.5rem;right:0.5rem;color:#ef4444;" data-action="remove-exercise-row" data-index="${index}" title="Remover exercício">${icon("x")}</button>
+                  <div style="margin-bottom:0.75rem;">
+                    <span class="text-muted" style="font-size:0.75rem;font-weight:500;">Nome do Exercício</span>
+                    <input type="text" class="input input-sm" style="margin:0.25rem 0 0;" name="ex_nome_${index}" value="${escapeHtml(e.nome)}" required placeholder="Ex: Supino Reto">
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr 2fr;gap:0.5rem;margin-bottom:0.5rem;">
+                    <div>
+                      <span class="text-muted" style="font-size:0.75rem;font-weight:500;">Séries</span>
+                      <input type="text" class="input input-sm" style="margin:0.25rem 0 0;" name="ex_series_${index}" value="${escapeHtml(e.series)}" placeholder="Ex: 4">
+                    </div>
+                    <div>
+                      <span class="text-muted" style="font-size:0.75rem;font-weight:500;">Reps</span>
+                      <input type="text" class="input input-sm" style="margin:0.25rem 0 0;" name="ex_reps_${index}" value="${escapeHtml(e.repeticoes)}" placeholder="Ex: 10">
+                    </div>
+                    <div>
+                      <span class="text-muted" style="font-size:0.75rem;font-weight:500;">Carga</span>
+                      <input type="text" class="input input-sm" style="margin:0.25rem 0 0;" name="ex_carga_${index}" value="${escapeHtml(e.carga)}" placeholder="Ex: 20kg">
+                    </div>
+                  </div>
+                  <div>
+                    <span class="text-muted" style="font-size:0.75rem;font-weight:500;">Observação</span>
+                    <input type="text" class="input input-sm" style="margin:0.25rem 0 0;" name="ex_obs_${index}" value="${escapeHtml(e.obs || "")}" placeholder="Ex: Intervalo de 60s">
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+
+          <div style="border-top:1px solid var(--border-color);padding-top:1rem;">
+            <label class="field">
+              <span class="label">Recomendações e Observações Gerais</span>
+              <textarea class="form-input" style="height:80px;width:100%;border-radius:0.5rem;padding:0.5rem;" name="workout_observacoes" placeholder="Orientações sobre alongamento, cardio, etc.">${escapeHtml(workout.observacoes || "")}</textarea>
+            </label>
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="margin-top:1rem;">${icon("save")} Salvar Ficha de Treino</button>
+        </form>
+      `;
+    }
+
+    const isEditing = state.editingNote !== null;
+    const noteModalHtml = state.noteModalOpen ? `
+      <div class="modal-backdrop premium-modal-backdrop" role="presentation" data-action="close-note-modal-backdrop">
+        <section class="modal-card premium-modal-card" style="max-width:450px;width:100%;margin:4rem auto;background:var(--card-bg);border-radius:1rem;overflow:hidden;box-shadow:var(--shadow-lg);" role="dialog" aria-modal="true" data-modal-card>
+          <div class="modal-head" style="padding:1.25rem;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center;">
+            <h2 style="font-size:1.2rem;font-weight:700;margin:0;">${isEditing ? "Editar Anotação" : "Nova Anotação"}</h2>
+            <button class="icon-btn" data-action="close-note-modal" aria-label="Fechar modal">${icon("x")}</button>
+          </div>
+          <form class="form" data-form="save-note" style="padding:1.25rem;display:flex;flex-direction:column;gap:1rem;">
+            ${selectFieldMarkup(
+              "Categoria", 
+              "note_categoria", 
+              ["observações", "evolução física", "restrições alimentares", "dieta passada", "treino recomendado"], 
+              isEditing ? state.editingNote.categoria : "observações"
+            )}
+            <label class="field">
+              <span class="label">Conteúdo da Anotação</span>
+              <textarea class="form-input" style="height:120px;width:100%;border-radius:0.5rem;padding:0.5rem;" name="note_content" required placeholder="Escreva aqui os detalhes da evolução, queixas ou notas do paciente...">${isEditing ? escapeHtml(state.editingNote.content) : ""}</textarea>
+            </label>
+            <div data-form-error></div>
+            <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:0.5rem;">
+              <button type="button" class="btn btn-secondary btn-sm" data-action="close-note-modal">Cancelar</button>
+              <button type="submit" class="btn btn-primary btn-sm">${icon("check")} Salvar</button>
+            </div>
+          </form>
+        </section>
+      </div>
+    ` : "";
+
+    return pageShell(
+      `
+      <main class="page-main">
+        <div class="container-wide">
+          
+          <div style="margin-bottom:1.5rem;">
+            <button class="btn btn-ghost" data-action="back-to-patients" style="padding-left:0;font-weight:600;">
+              ${icon("arrowLeft")} Voltar para Pacientes
+            </button>
+          </div>
+
+          <section class="card" style="padding:1.5rem;background:var(--card-bg);border:1px solid var(--border-color);border-radius:1rem;margin-bottom:2rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1.5rem;">
+              <div style="display:flex;align-items:center;gap:1.25rem;">
+                <span class="patient-avatar" style="width:3.5rem;height:3.5rem;border-radius:50%;background:var(--gradient-hero);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:bold;font-size:1.5rem;">
+                  ${getInitials(p.nome)}
+                </span>
+                <div>
+                  <h1 style="margin:0;font-size:1.6rem;font-weight:700;">Prontuário: ${escapeHtml(p.nome)}</h1>
+                  <p class="text-muted" style="margin:0.25rem 0 0;font-size:0.9rem;">Objetivo: <strong>${escapeHtml(p.objetivo || "Não definido")}</strong></p>
+                </div>
+              </div>
+              
+              <div style="display:flex;gap:1.5rem;border-left:1px solid var(--border-color);padding-left:1.5rem;flex-wrap:wrap;">
+                <div>
+                  <span class="text-muted" style="font-size:0.75rem;display:block;">Idade</span>
+                  <strong>${p.idade ? `${p.idade} anos` : "--"}</strong>
+                </div>
+                <div>
+                  <span class="text-muted" style="font-size:0.75rem;display:block;">Peso</span>
+                  <strong>${p.peso ? `${p.peso} kg` : "--"}</strong>
+                </div>
+                <div>
+                  <span class="text-muted" style="font-size:0.75rem;display:block;">Altura</span>
+                  <strong>${p.altura ? `${p.altura} m` : "--"}</strong>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <div class="details-split" style="display:grid;grid-template-columns:1.2fr 1.8fr;gap:2rem;align-items:flex-start;">
+            
+            <section class="card" style="padding:1.5rem;background:var(--card-bg);border:1px solid var(--border-color);border-radius:1rem;">
+              <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border-color);padding-bottom:1rem;margin-bottom:1rem;">
+                <h2 style="font-size:1.25rem;font-weight:600;margin:0;">Anotações</h2>
+                <button class="btn btn-primary btn-sm" data-action="open-note-modal">${icon("plus")} Adicionar</button>
+              </div>
+              ${notesHtml}
+            </section>
+
+            <section class="card" style="padding:1.5rem;background:var(--card-bg);border:1px solid var(--border-color);border-radius:1rem;">
+              ${planHtml}
+            </section>
+          </div>
+
+        </div>
+      </main>
+      ${noteModalHtml}
+      ${footerMarkup()}
+      `,
+      "/pacientes"
+    );
+  }
+
+  async function loadPatients(force = false) {
+    if (state.patients.loading || (state.patients.loaded && !force)) return;
+    state.patients.loading = true;
+    state.patients.error = "";
+    render();
+    try {
+      const searchParam = state.patients.search ? `?search=${encodeURIComponent(state.patients.search)}` : "";
+      const result = await apiRequest(`/patients${searchParam}`);
+      state.patients.items = result.patients || [];
+      state.patients.loaded = true;
+    } catch (error) {
+      state.patients.error = getErrorMessage(error, "Erro ao carregar pacientes");
+    } finally {
+      state.patients.loading = false;
+      render();
+    }
+  }
+
+  async function loadPatientDetails(patientId) {
+    state.patientNotes.loading = true;
+    state.patientNotes.error = "";
+    state.patientDiet.loading = true;
+    state.patientDiet.error = "";
+    state.patientWorkout.loading = true;
+    state.patientWorkout.error = "";
+    render();
+    
+    const user = getUser();
+    try {
+      const notesRes = await apiRequest(`/notes?patient_id=${patientId}`);
+      state.patientNotes.items = notesRes.notes || [];
+      
+      if (user?.role === "nutritionist") {
+        const dietRes = await apiRequest(`/patients/${patientId}/diet`);
+        state.patientDiet.data = dietRes.diet;
+      } else if (user?.role === "personal_trainer") {
+        const workoutRes = await apiRequest(`/patients/${patientId}/workout`);
+        state.patientWorkout.data = workoutRes.workout;
+      }
+    } catch (error) {
+      console.error("Error loading patient details:", error);
+    } finally {
+      state.patientNotes.loading = false;
+      state.patientDiet.loading = false;
+      state.patientWorkout.loading = false;
+      render();
+    }
+  }
+
+  function bindProfessional() {
+    app.querySelectorAll('[data-action="open-patient-modal"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.patientModalOpen = true;
+        render();
+      });
+    });
+
+    app.querySelectorAll('[data-action="close-patient-modal"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.patientModalOpen = false;
+        render();
+      });
+    });
+
+    app.querySelectorAll('[data-action="close-patient-modal-backdrop"]').forEach((el) => {
+      el.addEventListener("click", (e) => {
+        if (e.target === el) {
+          state.patientModalOpen = false;
+          render();
+        }
+      });
+    });
+
+    const patientSearch = app.querySelector("[data-patient-search]");
+    if (patientSearch) {
+      patientSearch.addEventListener("input", (e) => {
+        state.patients.search = e.target.value;
+        loadPatients(true);
+      });
+    }
+
+    const addPatientForm = app.querySelector('[data-form="add-patient"]');
+    if (addPatientForm) {
+      addPatientForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const data = new FormData(addPatientForm);
+        const name = String(data.get("nome") || "").trim();
+        const age = data.get("idade") ? Number(data.get("idade")) : null;
+        const weight = data.get("peso") ? Number(data.get("peso")) : null;
+        const height = data.get("altura") ? Number(data.get("altura")) : null;
+        const goal = String(data.get("objetivo") || "").trim();
+        const obs = String(data.get("observacoes") || "").trim();
+
+        const submitBtn = addPatientForm.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+
+        try {
+          await apiRequest("/patients", {
+            method: "POST",
+            body: JSON.stringify({ nome: name, idade: age, peso: weight, altura: height, objetivo: goal, observacoes: obs })
+          });
+          state.patientModalOpen = false;
+          await loadPatients(true);
+        } catch (err) {
+          setFormError(addPatientForm, getErrorMessage(err, "Falha ao cadastrar paciente"));
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+    }
+
+    app.querySelectorAll('[data-action="view-patient"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = Number(btn.dataset.id);
+        const patient = state.patients.items.find(item => item.id === id);
+        if (patient) {
+          state.selectedPatient = patient;
+          routeTo("/paciente-detalhe");
+        }
+      });
+    });
+
+    app.querySelectorAll('[data-action="delete-patient"]').forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = Number(btn.dataset.id);
+        if (!confirm("Tem certeza que deseja excluir este paciente e todos os seus registros?")) return;
+        try {
+          await apiRequest(`/patients/${id}`, { method: "DELETE" });
+          await loadPatients(true);
+        } catch (err) {
+          alert(getErrorMessage(err, "Falha ao excluir paciente"));
+        }
+      });
+    });
+
+    app.querySelectorAll('[data-action="back-to-patients"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.selectedPatient = null;
+        routeTo("/pacientes");
+      });
+    });
+
+    app.querySelectorAll('[data-action="open-note-modal"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.editingNote = null;
+        state.noteModalOpen = true;
+        render();
+      });
+    });
+
+    app.querySelectorAll('[data-action="close-note-modal"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.editingNote = null;
+        state.noteModalOpen = false;
+        render();
+      });
+    });
+
+    app.querySelectorAll('[data-action="close-note-modal-backdrop"]').forEach((el) => {
+      el.addEventListener("click", (e) => {
+        if (e.target === el) {
+          state.editingNote = null;
+          state.noteModalOpen = false;
+          render();
+        }
+      });
+    });
+
+    app.querySelectorAll('[data-action="edit-note"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const noteId = Number(btn.dataset.id);
+        const note = state.patientNotes.items.find(item => item.id === noteId);
+        if (note) {
+          state.editingNote = note;
+          state.noteModalOpen = true;
+          render();
+        }
+      });
+    });
+
+    app.querySelectorAll('[data-action="delete-note"]').forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const noteId = Number(btn.dataset.id);
+        if (!confirm("Excluir esta anotação?")) return;
+        try {
+          await apiRequest(`/notes/${noteId}`, { method: "DELETE" });
+          if (state.selectedPatient) loadPatientDetails(state.selectedPatient.id);
+        } catch (err) {
+          alert(getErrorMessage(err, "Falha ao excluir anotação"));
+        }
+      });
+    });
+
+    const noteForm = app.querySelector('[data-form="save-note"]');
+    if (noteForm) {
+      noteForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const data = new FormData(noteForm);
+        const category = String(data.get("note_categoria") || "observações").trim();
+        const content = String(data.get("note_content") || "").trim();
+
+        const submitBtn = noteForm.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+
+        try {
+          if (state.editingNote) {
+            await apiRequest(`/notes/${state.editingNote.id}`, {
+              method: "PUT",
+              body: JSON.stringify({ categoria: category, content: content })
+            });
+          } else {
+            await apiRequest("/notes", {
+              method: "POST",
+              body: JSON.stringify({ patient_id: state.selectedPatient.id, categoria: category, content: content })
+            });
+          }
+          state.noteModalOpen = false;
+          state.editingNote = null;
+          loadPatientDetails(state.selectedPatient.id);
+        } catch (err) {
+          setFormError(noteForm, getErrorMessage(err, "Falha ao salvar anotação"));
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+    }
+
+    const saveDietForm = app.querySelector('[data-form="save-diet"]');
+    if (saveDietForm) {
+      saveDietForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const meals = readMealsFromForm(saveDietForm);
+        const title = saveDietForm.querySelector('[name="diet_titulo"]')?.value || "";
+        const calories = Number(saveDietForm.querySelector('[name="diet_calorias"]')?.value) || null;
+        const protein = Number(saveDietForm.querySelector('[name="diet_proteinas"]')?.value) || null;
+        const carbs = Number(saveDietForm.querySelector('[name="diet_carboidratos"]')?.value) || null;
+        const fat = Number(saveDietForm.querySelector('[name="diet_gorduras"]')?.value) || null;
+        const obs = saveDietForm.querySelector('[name="diet_observacoes"]')?.value || "";
+
+        const submitBtn = saveDietForm.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+
+        try {
+          await apiRequest(`/patients/${state.selectedPatient.id}/diet`, {
+            method: "POST",
+            body: JSON.stringify({
+              titulo: title,
+              calorias: calories,
+              proteinas: protein,
+              carboidratos: carbs,
+              gorduras: fat,
+              refeicoes: meals,
+              observacoes: obs
+            })
+          });
+          alert("Plano alimentar salvo com sucesso!");
+          loadPatientDetails(state.selectedPatient.id);
+        } catch (err) {
+          alert(getErrorMessage(err, "Erro ao salvar plano alimentar"));
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+    }
+
+    app.querySelectorAll('[data-action="add-meal-row"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const currentMeals = readMealsFromForm(app.querySelector('[data-form="save-diet"]'));
+        currentMeals.push({ nome: "", horario: "", itens: "" });
+        
+        if (!state.patientDiet.data) state.patientDiet.data = {};
+        state.patientDiet.data.refeicoes = currentMeals;
+        
+        render();
+      });
+    });
+
+    app.querySelectorAll('[data-action="remove-meal-row"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const index = Number(btn.dataset.index);
+        const currentMeals = readMealsFromForm(app.querySelector('[data-form="save-diet"]'));
+        currentMeals.splice(index, 1);
+        
+        if (!state.patientDiet.data) state.patientDiet.data = {};
+        state.patientDiet.data.refeicoes = currentMeals;
+        
+        render();
+      });
+    });
+
+    const saveWorkoutForm = app.querySelector('[data-form="save-workout"]');
+    if (saveWorkoutForm) {
+      saveWorkoutForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const exercises = readExercisesFromForm(saveWorkoutForm);
+        const title = saveWorkoutForm.querySelector('[name="workout_titulo"]')?.value || "";
+        const muscle = saveWorkoutForm.querySelector('[name="workout_grupo_muscular"]')?.value || "";
+        const obs = saveWorkoutForm.querySelector('[name="workout_observacoes"]')?.value || "";
+
+        const submitBtn = saveWorkoutForm.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+
+        try {
+          await apiRequest(`/patients/${state.selectedPatient.id}/workout`, {
+            method: "POST",
+            body: JSON.stringify({
+              titulo: title,
+              grupo_muscular: muscle,
+              exercicios: exercises,
+              observacoes: obs
+            })
+          });
+          alert("Ficha de treino salva com sucesso!");
+          loadPatientDetails(state.selectedPatient.id);
+        } catch (err) {
+          alert(getErrorMessage(err, "Erro ao salvar ficha de treino"));
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+    }
+
+    app.querySelectorAll('[data-action="add-exercise-row"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const currentExercises = readExercisesFromForm(app.querySelector('[data-form="save-workout"]'));
+        currentExercises.push({ nome: "", series: "", repeticoes: "", carga: "", obs: "" });
+        
+        if (!state.patientWorkout.data) state.patientWorkout.data = {};
+        state.patientWorkout.data.exercicios = currentExercises;
+        
+        render();
+      });
+    });
+
+    app.querySelectorAll('[data-action="remove-exercise-row"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const index = Number(btn.dataset.index);
+        const currentExercises = readExercisesFromForm(app.querySelector('[data-form="save-workout"]'));
+        currentExercises.splice(index, 1);
+        
+        if (!state.patientWorkout.data) state.patientWorkout.data = {};
+        state.patientWorkout.data.exercicios = currentExercises;
+        
+        render();
+      });
+    });
+  }
+
+  function readMealsFromForm(form) {
+    if (!form) return [];
+    const mealRows = form.querySelectorAll("[data-meal-index]");
+    const meals = [];
+    mealRows.forEach((row) => {
+      const idx = row.dataset.mealIndex;
+      const nome = form.querySelector(`[name="meal_nome_${idx}"]`)?.value || "";
+      const horario = form.querySelector(`[name="meal_horario_${idx}"]`)?.value || "";
+      const itens = form.querySelector(`[name="meal_itens_${idx}"]`)?.value || "";
+      meals.push({ nome, horario, itens });
+    });
+    return meals;
+  }
+
+  function readExercisesFromForm(form) {
+    if (!form) return [];
+    const exerciseRows = form.querySelectorAll("[data-exercise-index]");
+    const exercises = [];
+    exerciseRows.forEach((row) => {
+      const idx = row.dataset.exerciseIndex;
+      const nome = form.querySelector(`[name="ex_nome_${idx}"]`)?.value || "";
+      const series = form.querySelector(`[name="ex_series_${idx}"]`)?.value || "";
+      const repeticoes = form.querySelector(`[name="ex_reps_${idx}"]`)?.value || "";
+      const carga = form.querySelector(`[name="ex_carga_${idx}"]`)?.value || "";
+      const obs = form.querySelector(`[name="ex_obs_${idx}"]`)?.value || "";
+      exercises.push({ nome, series, repeticoes, carga, obs });
+    });
+    return exercises;
   }
 
   migratePersistentSession();

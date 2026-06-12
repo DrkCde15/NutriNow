@@ -8,6 +8,22 @@ from app.database import get_db
 from app.services.account_cache import get_cached_account
 from app.services.schema_cache import ensure_usuario_access_columns
 
+USER_ROLE = "user"
+NUTRITIONIST_ROLE = "nutritionist"
+PERSONAL_TRAINER_ROLE = "personal_trainer"
+ROLE_VALUES = (USER_ROLE, NUTRITIONIST_ROLE, PERSONAL_TRAINER_ROLE)
+PROFESSIONAL_ROLES = (NUTRITIONIST_ROLE, PERSONAL_TRAINER_ROLE)
+ROLE_LABELS = {
+    USER_ROLE: "Usuario comum",
+    NUTRITIONIST_ROLE: "Nutricionista",
+    PERSONAL_TRAINER_ROLE: "Personal Trainer",
+}
+ROLE_CAPABILITIES = {
+    USER_ROLE: frozenset(),
+    NUTRITIONIST_ROLE: frozenset({"patients", "notes", "diet"}),
+    PERSONAL_TRAINER_ROLE: frozenset({"patients", "notes", "workout"}),
+}
+
 PREMIUM_REQUIRED_RESPONSE = {
     "error": "Recurso exclusivo para contas premium",
     "code": "premium_required",
@@ -58,12 +74,25 @@ def account_plan(account):
     return "premium" if account_is_premium(account) else "free"
 
 
+def normalize_role(value):
+    role = str(value or USER_ROLE).strip()
+    return role if role in ROLE_VALUES else USER_ROLE
+
+
+def is_professional_role(role):
+    return normalize_role(role) in PROFESSIONAL_ROLES
+
+
+def role_has_capability(role, capability):
+    return capability in ROLE_CAPABILITIES.get(normalize_role(role), frozenset())
+
+
 def _load_account_access(user_id):
     with get_db() as (cursor, conn):
         ensure_usuario_access_columns(cursor)
         cursor.execute(
             """
-            SELECT id, is_premium, premium_expires_at
+            SELECT id, is_premium, premium_expires_at, role
             FROM usuarios
             WHERE id=%s
             LIMIT 1
@@ -81,6 +110,17 @@ def user_has_premium(user_id):
     return account_is_premium(_load_account_access(user_id))
 
 
+def user_role(user_id):
+    cached_account = get_cached_account(user_id)
+    if cached_account and "role" in cached_account:
+        return normalize_role(cached_account["role"])
+
+    user = _load_account_access(user_id)
+    if not user:
+        return USER_ROLE
+    return normalize_role(user.get("role"))
+
+
 def premium_required(view_func):
     @wraps(view_func)
     def wrapper(*args, **kwargs):
@@ -90,3 +130,33 @@ def premium_required(view_func):
         return view_func(*args, **kwargs)
 
     return wrapper
+
+
+def professional_required(view_func):
+    @wraps(view_func)
+    def wrapper(*args, **kwargs):
+        user_id = get_jwt_identity()
+        if not user_id:
+            return jsonify({"error": "Nao autenticado"}), 401
+        role = user_role(user_id)
+        if not is_professional_role(role):
+            return jsonify({"error": "Recurso exclusivo para profissionais da saude"}), 403
+        return view_func(*args, **kwargs)
+
+    return wrapper
+
+
+def role_capability_required(capability, error_message=None):
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(*args, **kwargs):
+            user_id = get_jwt_identity()
+            if not user_id:
+                return jsonify({"error": "Nao autenticado"}), 401
+            if not role_has_capability(user_role(user_id), capability):
+                return jsonify({"error": error_message or "Perfil profissional sem permissao para este recurso"}), 403
+            return view_func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
