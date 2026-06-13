@@ -21,7 +21,67 @@ CREATE TABLE IF NOT EXISTS usuarios (
     genero ENUM('Masculino','Feminino') NOT NULL,
     email VARCHAR(255) NOT NULL UNIQUE,
     senha VARCHAR(255) NOT NULL,
-    criado_em DATETIME DEFAULT CURRENT_TIMESTAMP
+    criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
+    role ENUM('user', 'nutritionist', 'personal_trainer') DEFAULT 'user',
+    is_premium TINYINT(1) DEFAULT 0,
+    premium_expires_at DATETIME NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tabela de pacientes (vinculados a um profissional)
+CREATE TABLE IF NOT EXISTS pacientes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    professional_id INT NOT NULL,
+    nome VARCHAR(255) NOT NULL,
+    idade INT,
+    peso DECIMAL(5,2),
+    altura DECIMAL(5,2),
+    objetivo VARCHAR(255),
+    observacoes TEXT,
+    criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (professional_id) REFERENCES usuarios(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tabela de anotações profissionais
+CREATE TABLE IF NOT EXISTS paciente_anotacoes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    patient_id INT NOT NULL,
+    professional_id INT NOT NULL,
+    categoria VARCHAR(50) DEFAULT 'observações',
+    content TEXT NOT NULL,
+    criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (patient_id) REFERENCES pacientes(id) ON DELETE CASCADE,
+    FOREIGN KEY (professional_id) REFERENCES usuarios(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tabela de dietas (específico para nutricionistas)
+CREATE TABLE IF NOT EXISTS paciente_dietas (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    patient_id INT NOT NULL,
+    professional_id INT NOT NULL,
+    titulo VARCHAR(255),
+    calorias INT,
+    proteinas INT,
+    carboidratos INT,
+    gorduras INT,
+    refeicoes JSON,
+    observacoes TEXT,
+    criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (patient_id) REFERENCES pacientes(id) ON DELETE CASCADE,
+    FOREIGN KEY (professional_id) REFERENCES usuarios(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tabela de treinos (específico para personal trainers)
+CREATE TABLE IF NOT EXISTS paciente_treinos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    patient_id INT NOT NULL,
+    professional_id INT NOT NULL,
+    titulo VARCHAR(255),
+    grupo_muscular VARCHAR(255),
+    exercicios JSON,
+    observacoes TEXT,
+    criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (patient_id) REFERENCES pacientes(id) ON DELETE CASCADE,
+    FOREIGN KEY (professional_id) REFERENCES usuarios(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Tabela de redefinição de senha

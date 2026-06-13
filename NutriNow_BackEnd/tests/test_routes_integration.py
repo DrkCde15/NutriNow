@@ -11,6 +11,7 @@ from app.routes.billing import billing_bp
 from app.routes.chatbot import chatbot_bp
 from app.routes.feedbacks import feedback_bp
 from app.routes.fitness import fitness_bp
+from app.routes.professional import professional_bp
 from app.routes.profile import profile_bp
 
 
@@ -343,6 +344,28 @@ class RouteIntegrationTest(unittest.TestCase):
         self.assertIn("refId=nutrinow_user_7", data["checkout_url"])
         self.assertIn("offer=abc", data["checkout_url"])
         self.assertFalse(data["alreadyPremium"])
+
+    def test_professional_patients_block_common_user_before_database(self):
+        app = create_test_app(professional_bp)
+        with patch("app.services.access_control.user_role", return_value="user"), patch(
+            "app.routes.professional.get_db"
+        ) as get_db:
+            response = app.test_client().get("/patients", headers=auth_header(app))
+
+        self.assertEqual(response.status_code, 403)
+        self.assertIn("profissionais", response.get_json()["error"])
+        get_db.assert_not_called()
+
+    def test_diet_endpoint_blocks_personal_trainer_before_database(self):
+        app = create_test_app(professional_bp)
+        with patch("app.services.access_control.user_role", return_value="personal_trainer"), patch(
+            "app.routes.professional.user_role", return_value="personal_trainer"
+        ), patch("app.routes.professional.get_db") as get_db:
+            response = app.test_client().get("/patients/9/diet", headers=auth_header(app))
+
+        self.assertEqual(response.status_code, 403)
+        self.assertIn("nutricionistas", response.get_json()["error"])
+        get_db.assert_not_called()
 
     def test_cakto_webhook_activates_premium_after_paid_order_validation(self):
         app = create_test_app(billing_bp)

@@ -1170,7 +1170,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
   function cadastroPage() {
     return authShell(
       "Crie sua conta",
-      "Escolha seu perfil e preencha os dados para começar.",
+      "Preencha seus dados para começar com planos personalizados.",
       `
       <form class="form" data-form="cadastro">
         <div class="grid-2">
@@ -2734,6 +2734,149 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     };
   }
 
+  function exportPatientPDF(patient) {
+    if (!patient) return;
+    const user = getUser();
+    const isNutri = user?.role === "nutritionist";
+    const notes = state.patientNotes.items || [];
+    const plan = isNutri ? state.patientDiet.data : state.patientWorkout.data;
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      alert("Por favor, permita pop-ups para exportar o PDF.");
+      return;
+    }
+
+    let planHtml = "";
+    if (plan) {
+      if (isNutri) {
+        planHtml = `
+          <div class="pdf-section">
+            <h2 class="pdf-h2">Plano Alimentar: ${escapeHtml(plan.titulo || "Prescrição")}</h2>
+            <div class="pdf-macros">
+              <div class="pdf-macro"><span>Kcal</span><strong>${plan.calorias || "--"}</strong></div>
+              <div class="pdf-macro"><span>Prot</span><strong>${plan.proteinas || "--"}g</strong></div>
+              <div class="pdf-macro"><span>Carbo</span><strong>${plan.carboidratos || "--"}g</strong></div>
+              <div class="pdf-macro"><span>Gord</span><strong>${plan.gorduras || "--"}g</strong></div>
+            </div>
+            <div class="pdf-items">
+              ${(plan.refeicoes || []).map(m => `
+                <div class="pdf-item-row">
+                  <div class="pdf-item-head">
+                    <strong>${escapeHtml(m.nome)}</strong>
+                    <span class="pdf-time">${escapeHtml(m.horario)}</span>
+                  </div>
+                  <p class="pdf-item-body">${escapeHtml(m.itens)}</p>
+                </div>
+              `).join("")}
+            </div>
+            ${plan.observacoes ? `<div class="pdf-obs"><strong>Orientações:</strong><p>${escapeHtml(plan.observacoes)}</p></div>` : ""}
+          </div>
+        `;
+      } else {
+        planHtml = `
+          <div class="pdf-section">
+            <h2 class="pdf-h2">Ficha de Treino: ${escapeHtml(plan.titulo || "Prescrição")}</h2>
+            <p class="pdf-subtitle"><strong>Grupo Muscular:</strong> ${escapeHtml(plan.grupo_muscular || "--")}</p>
+            <div class="pdf-items">
+              ${(plan.exercicios || []).map(e => `
+                <div class="pdf-item-row">
+                  <div class="pdf-item-head">
+                    <strong>${escapeHtml(e.nome)}</strong>
+                    <span class="pdf-time">${e.series}x${e.repeticoes} ${e.carga ? `| ${e.carga}` : ""}</span>
+                  </div>
+                  ${e.obs ? `<p class="pdf-item-body">${escapeHtml(e.obs)}</p>` : ""}
+                </div>
+              `).join("")}
+            </div>
+            ${plan.observacoes ? `<div class="pdf-obs"><strong>Recomendações:</strong><p>${escapeHtml(plan.observacoes)}</p></div>` : ""}
+          </div>
+        `;
+      }
+    }
+
+    const html = `
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+      <head>
+        <meta charset="UTF-8">
+        <title>NutriNow Pro - ${escapeHtml(patient.nome)}</title>
+        <style>
+          :root { --primary: #22c55e; --text: #1f2937; --muted: #6b7280; --border: #e5e7eb; --bg: #f9fafb; }
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 40px; color: var(--text); background: white; line-height: 1.5; margin: 0; }
+          .pdf-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid var(--primary); padding-bottom: 20px; margin-bottom: 30px; }
+          .pdf-brand { font-size: 28px; font-weight: 800; color: var(--primary); letter-spacing: -0.02em; }
+          .pdf-prof-info { text-align: right; font-size: 14px; color: var(--muted); }
+          .pdf-prof-info strong { color: var(--text); font-size: 16px; display: block; margin-bottom: 2px; }
+          .pdf-patient-card { background: var(--bg); border: 1px solid var(--border); padding: 24px; border-radius: 12px; margin-bottom: 30px; }
+          .pdf-patient-card h1 { margin: 0 0 16px; font-size: 22px; font-weight: 700; }
+          .pdf-patient-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; font-size: 14px; }
+          .pdf-patient-item span { display: block; color: var(--muted); font-size: 12px; text-transform: uppercase; font-weight: 600; }
+          .pdf-patient-item strong { font-size: 15px; }
+          .pdf-section { margin-bottom: 32px; }
+          .pdf-h2 { font-size: 18px; font-weight: 700; margin-bottom: 16px; border-left: 4px solid var(--primary); padding-left: 12px; }
+          .pdf-subtitle { font-size: 14px; margin-top: -8px; margin-bottom: 16px; color: var(--muted); }
+          .pdf-macros { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+          .pdf-macro { background: white; border: 1px solid var(--border); padding: 10px; border-radius: 8px; text-align: center; }
+          .pdf-macro span { display: block; font-size: 10px; color: var(--muted); text-transform: uppercase; }
+          .pdf-item-row { border-bottom: 1px solid var(--border); padding: 12px 0; }
+          .pdf-item-row:last-child { border-bottom: none; }
+          .pdf-item-head { display: flex; justify-content: space-between; align-items: baseline; }
+          .pdf-time { font-size: 13px; font-weight: 600; color: var(--primary); }
+          .pdf-item-body { margin: 4px 0 0; font-size: 14px; color: #4b5563; }
+          .pdf-obs { background: #f0fdf4; border: 1px solid #bbf7d0; padding: 16px; border-radius: 8px; margin-top: 20px; font-size: 14px; }
+          .pdf-obs strong { display: block; margin-bottom: 4px; color: #166534; }
+          .pdf-notes { font-size: 13px; color: #4b5563; }
+          .pdf-note-item { margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px dashed var(--border); }
+          .pdf-note-meta { color: var(--muted); font-size: 11px; margin-bottom: 2px; }
+          .pdf-footer { margin-top: 60px; text-align: center; font-size: 11px; color: var(--muted); border-top: 1px solid var(--border); padding-top: 20px; }
+          @media print { body { padding: 0; } .no-print { display: none; } }
+        </style>
+      </head>
+      <body>
+        <div class="pdf-header">
+          <div class="pdf-brand">NutriNow Pro</div>
+          <div class="pdf-prof-info">
+            <strong>${escapeHtml(user.nome)} ${escapeHtml(user.sobrenome || "")}</strong>
+            ${escapeHtml(roleLabel(user.role))}<br>
+            ${escapeHtml(user.email)}
+          </div>
+        </div>
+        <div class="pdf-patient-card">
+          <h1>Prontuário do Paciente</h1>
+          <div class="pdf-patient-grid">
+            <div class="pdf-patient-item"><span>Nome</span><strong>${escapeHtml(patient.nome)}</strong></div>
+            <div class="pdf-patient-item"><span>Idade</span><strong>${patient.idade || "--"} anos</strong></div>
+            <div class="pdf-patient-item"><span>Objetivo</span><strong>${escapeHtml(patient.objetivo || "--")}</strong></div>
+            <div class="pdf-patient-item"><span>Peso</span><strong>${patient.peso || "--"} kg</strong></div>
+            <div class="pdf-patient-item"><span>Altura</span><strong>${patient.altura || "--"} m</strong></div>
+            <div class="pdf-patient-item"><span>Data Exportação</span><strong>${new Date().toLocaleDateString()}</strong></div>
+          </div>
+        </div>
+        ${planHtml}
+        ${notes.length ? `
+          <div class="pdf-section">
+            <h2 class="pdf-h2">Histórico e Evolução</h2>
+            <div class="pdf-notes">
+              ${notes.map(n => `
+                <div class="pdf-note-item">
+                  <div class="pdf-note-meta">${formatShortDate(n.criado_em)} - ${escapeHtml(n.categoria)}</div>
+                  <div>${escapeHtml(n.content)}</div>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        ` : ""}
+        <div class="pdf-footer"> Este documento é para fins de acompanhamento profissional. Gerado via NutriNow Pro. </div>
+        <script>window.onload = () => { setTimeout(() => { window.print(); window.close(); }, 500); }</script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+  }
+
   async function loadFeedbacks(force = false, options = {}) {
     const { silent = false } = options;
     if (!force && state.feedbacks.loaded) return;
@@ -3391,11 +3534,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
             });
             saveSessionPayload(payload);
           }
-          
-          const user = getUser();
-          const target = defaultAuthenticatedRoute(user);
-          routeTo(target);
-          
+          routeTo(defaultAuthenticatedRoute(getUser()));
         } catch (error) {
           setFormError(cadastro, getErrorMessage(error, "Erro ao cadastrar"));
           button.disabled = false;
@@ -4349,7 +4488,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     const user = getUser();
     if (!user) return loginPage();
     if (!isProfessionalUser(user)) {
-      routeTo("/index", true);
+      routeTo("/dashboard", true);
       return "";
     }
 
@@ -4414,7 +4553,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     const user = getUser();
     if (!user) return loginPage();
     if (user.role === "user") {
-      routeTo("/index", true);
+      routeTo("/dashboard", true);
       return "";
     }
 
@@ -4731,6 +4870,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
                   <strong>${p.altura ? `${p.altura} m` : "--"}</strong>
                 </div>
                 <button class="btn btn-secondary btn-sm" data-action="edit-patient" data-id="${p.id}">${icon("pencil")} Editar</button>
+                <button class="btn btn-primary btn-sm" data-action="export-pdf">${icon("save")} Exportar PDF</button>
               </div>
             </div>
           </section>
@@ -5027,10 +5167,11 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
         const content = String(data.get("note_content") || "").trim();
         const patientId = state.selectedPatient?.id || Number(data.get("patient_id"));
 
-        if (!state.editingNote && !patientId) {
-          setFormError(noteForm, "Selecione um paciente para associar a anotação.");
-          return;
-        }
+        const payload = {
+          patient_id: patientId,
+          categoria: category,
+          content: content,
+        };
 
         const submitBtn = noteForm.querySelector('button[type="submit"]');
         submitBtn.disabled = true;
@@ -5039,19 +5180,18 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
           if (state.editingNote) {
             await apiRequest(`/notes/${state.editingNote.id}`, {
               method: "PUT",
-              body: JSON.stringify({ categoria: category, content: content })
+              body: JSON.stringify(payload),
             });
           } else {
             await apiRequest("/notes", {
               method: "POST",
-              body: JSON.stringify({ patient_id: patientId, categoria: category, content: content })
+              body: JSON.stringify(payload),
             });
           }
           state.noteModalOpen = false;
           state.editingNote = null;
-          state.professionalNotes.loaded = false;
-          if (state.selectedPatient) loadPatientDetails(state.selectedPatient.id);
-          if (normalizePath(getCurrentPath()) === "/anotacoes") loadProfessionalNotes(true);
+          if (state.selectedPatient) await loadPatientDetails(state.selectedPatient.id);
+          if (normalizePath(getCurrentPath()) === "/anotacoes") await loadProfessionalNotes(true);
         } catch (err) {
           setFormError(noteForm, getErrorMessage(err, "Falha ao salvar anotação"));
         } finally {
@@ -5060,52 +5200,13 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
       });
     }
 
-    const saveDietForm = app.querySelector('[data-form="save-diet"]');
-    if (saveDietForm) {
-      saveDietForm.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const meals = readMealsFromForm(saveDietForm);
-        const title = saveDietForm.querySelector('[name="diet_titulo"]')?.value || "";
-        const calories = Number(saveDietForm.querySelector('[name="diet_calorias"]')?.value) || null;
-        const protein = Number(saveDietForm.querySelector('[name="diet_proteinas"]')?.value) || null;
-        const carbs = Number(saveDietForm.querySelector('[name="diet_carboidratos"]')?.value) || null;
-        const fat = Number(saveDietForm.querySelector('[name="diet_gorduras"]')?.value) || null;
-        const obs = saveDietForm.querySelector('[name="diet_observacoes"]')?.value || "";
-
-        const submitBtn = saveDietForm.querySelector('button[type="submit"]');
-        submitBtn.disabled = true;
-
-        try {
-          await apiRequest(`/patients/${state.selectedPatient.id}/diet`, {
-            method: "POST",
-            body: JSON.stringify({
-              titulo: title,
-              calorias: calories,
-              proteinas: protein,
-              carboidratos: carbs,
-              gorduras: fat,
-              refeicoes: meals,
-              observacoes: obs
-            })
-          });
-          alert("Plano alimentar salvo com sucesso!");
-          loadPatientDetails(state.selectedPatient.id);
-        } catch (err) {
-          alert(getErrorMessage(err, "Erro ao salvar plano alimentar"));
-        } finally {
-          submitBtn.disabled = false;
-        }
-      });
-    }
-
+    // Lógica para Nutricionistas (Refeições)
     app.querySelectorAll('[data-action="add-meal-row"]').forEach((btn) => {
       btn.addEventListener("click", () => {
-        const currentMeals = readMealsFromForm(app.querySelector('[data-form="save-diet"]'));
-        currentMeals.push({ nome: "", horario: "", itens: "" });
-        
-        if (!state.patientDiet.data) state.patientDiet.data = {};
-        state.patientDiet.data.refeicoes = currentMeals;
-        
+        const diet = state.patientDiet.data || { refeicoes: [] };
+        diet.refeicoes = diet.refeicoes || [];
+        diet.refeicoes.push({ nome: "", horario: "", itens: "" });
+        state.patientDiet.data = diet;
         render();
       });
     });
@@ -5113,56 +5214,52 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     app.querySelectorAll('[data-action="remove-meal-row"]').forEach((btn) => {
       btn.addEventListener("click", () => {
         const index = Number(btn.dataset.index);
-        const currentMeals = readMealsFromForm(app.querySelector('[data-form="save-diet"]'));
-        currentMeals.splice(index, 1);
-        
-        if (!state.patientDiet.data) state.patientDiet.data = {};
-        state.patientDiet.data.refeicoes = currentMeals;
-        
+        state.patientDiet.data.refeicoes.splice(index, 1);
         render();
       });
     });
 
-    const saveWorkoutForm = app.querySelector('[data-form="save-workout"]');
-    if (saveWorkoutForm) {
-      saveWorkoutForm.addEventListener("submit", async (e) => {
+    const dietForm = app.querySelector('[data-form="save-diet"]');
+    if (dietForm) {
+      dietForm.addEventListener("submit", async (e) => {
         e.preventDefault();
-        const exercises = readExercisesFromForm(saveWorkoutForm);
-        const title = saveWorkoutForm.querySelector('[name="workout_titulo"]')?.value || "";
-        const muscle = saveWorkoutForm.querySelector('[name="workout_grupo_muscular"]')?.value || "";
-        const obs = saveWorkoutForm.querySelector('[name="workout_observacoes"]')?.value || "";
+        const formData = new FormData(dietForm);
+        const refeicoes = (state.patientDiet.data?.refeicoes || []).map((_, i) => ({
+          nome: formData.get(`meal_nome_${i}`),
+          horario: formData.get(`meal_horario_${i}`),
+          itens: formData.get(`meal_itens_${i}`),
+        }));
 
-        const submitBtn = saveWorkoutForm.querySelector('button[type="submit"]');
-        submitBtn.disabled = true;
+        const payload = {
+          titulo: formData.get("diet_titulo"),
+          calorias: Number(formData.get("diet_calorias")),
+          proteinas: Number(formData.get("diet_proteinas")),
+          carboidratos: Number(formData.get("diet_carboidratos")),
+          gorduras: Number(formData.get("diet_gorduras")),
+          refeicoes: refeicoes,
+          observacoes: formData.get("diet_observacoes"),
+        };
 
         try {
-          await apiRequest(`/patients/${state.selectedPatient.id}/workout`, {
+          await apiRequest(`/patients/${state.selectedPatient.id}/diet`, {
             method: "POST",
-            body: JSON.stringify({
-              titulo: title,
-              grupo_muscular: muscle,
-              exercicios: exercises,
-              observacoes: obs
-            })
+            body: JSON.stringify(payload),
           });
-          alert("Ficha de treino salva com sucesso!");
+          alert("Plano alimentar salvo com sucesso!");
           loadPatientDetails(state.selectedPatient.id);
         } catch (err) {
-          alert(getErrorMessage(err, "Erro ao salvar ficha de treino"));
-        } finally {
-          submitBtn.disabled = false;
+          alert(getErrorMessage(err, "Falha ao salvar dieta"));
         }
       });
     }
 
+    // Lógica para Personal Trainers (Exercícios)
     app.querySelectorAll('[data-action="add-exercise-row"]').forEach((btn) => {
       btn.addEventListener("click", () => {
-        const currentExercises = readExercisesFromForm(app.querySelector('[data-form="save-workout"]'));
-        currentExercises.push({ nome: "", series: "", repeticoes: "", carga: "", obs: "" });
-        
-        if (!state.patientWorkout.data) state.patientWorkout.data = {};
-        state.patientWorkout.data.exercicios = currentExercises;
-        
+        const workout = state.patientWorkout.data || { exercicios: [] };
+        workout.exercicios = workout.exercicios || [];
+        workout.exercicios.push({ nome: "", series: "", repeticoes: "", carga: "", obs: "" });
+        state.patientWorkout.data = workout;
         render();
       });
     });
@@ -5170,49 +5267,49 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     app.querySelectorAll('[data-action="remove-exercise-row"]').forEach((btn) => {
       btn.addEventListener("click", () => {
         const index = Number(btn.dataset.index);
-        const currentExercises = readExercisesFromForm(app.querySelector('[data-form="save-workout"]'));
-        currentExercises.splice(index, 1);
-        
-        if (!state.patientWorkout.data) state.patientWorkout.data = {};
-        state.patientWorkout.data.exercicios = currentExercises;
-        
+        state.patientWorkout.data.exercicios.splice(index, 1);
         render();
+      });
+    });
+
+    const workoutForm = app.querySelector('[data-form="save-workout"]');
+    if (workoutForm) {
+      workoutForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const formData = new FormData(workoutForm);
+        const exercicios = (state.patientWorkout.data?.exercicios || []).map((_, i) => ({
+          nome: formData.get(`ex_nome_${i}`),
+          series: formData.get(`ex_series_${i}`),
+          repeticoes: formData.get(`ex_reps_${i}`),
+          carga: formData.get(`ex_carga_${i}`),
+          obs: formData.get(`ex_obs_${i}`),
+        }));
+
+        const payload = {
+          titulo: formData.get("workout_titulo"),
+          grupo_muscular: formData.get("workout_grupo_muscular"),
+          exercicios: exercicios,
+          observacoes: formData.get("workout_observacoes"),
+        };
+
+        try {
+          await apiRequest(`/patients/${state.selectedPatient.id}/workout`, {
+            method: "POST",
+            body: JSON.stringify(payload),
+          });
+          alert("Ficha de treino salva com sucesso!");
+          loadPatientDetails(state.selectedPatient.id);
+        } catch (err) {
+          alert(getErrorMessage(err, "Falha ao salvar treino"));
+        }
+      });
+    }
+
+    app.querySelectorAll('[data-action="export-pdf"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        exportPatientPDF(state.selectedPatient);
       });
     });
   }
 
-  function readMealsFromForm(form) {
-    if (!form) return [];
-    const mealRows = form.querySelectorAll("[data-meal-index]");
-    const meals = [];
-    mealRows.forEach((row) => {
-      const idx = row.dataset.mealIndex;
-      const nome = form.querySelector(`[name="meal_nome_${idx}"]`)?.value || "";
-      const horario = form.querySelector(`[name="meal_horario_${idx}"]`)?.value || "";
-      const itens = form.querySelector(`[name="meal_itens_${idx}"]`)?.value || "";
-      meals.push({ nome, horario, itens });
-    });
-    return meals;
-  }
-
-  function readExercisesFromForm(form) {
-    if (!form) return [];
-    const exerciseRows = form.querySelectorAll("[data-exercise-index]");
-    const exercises = [];
-    exerciseRows.forEach((row) => {
-      const idx = row.dataset.exerciseIndex;
-      const nome = form.querySelector(`[name="ex_nome_${idx}"]`)?.value || "";
-      const series = form.querySelector(`[name="ex_series_${idx}"]`)?.value || "";
-      const repeticoes = form.querySelector(`[name="ex_reps_${idx}"]`)?.value || "";
-      const carga = form.querySelector(`[name="ex_carga_${idx}"]`)?.value || "";
-      const obs = form.querySelector(`[name="ex_obs_${idx}"]`)?.value || "";
-      exercises.push({ nome, series, repeticoes, carga, obs });
-    });
-    return exercises;
-  }
-
-  migratePersistentSession();
-  render();
-  bootstrapPersistentSession();
-  syncAccountSnapshot();
 })();
