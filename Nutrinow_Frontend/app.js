@@ -667,6 +667,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     const desktopActions = user
       ? accountActionsMarkup(active, user)
       : `
+        <a href="/chat" data-link class="btn btn-ghost" style="padding: 0.5rem;" aria-label="Chat NutriAI" title="Chat NutriAI">${icon("message", "icon-lg")}</a>
         <a href="/login" data-link class="btn btn-ghost">Entrar</a>
         <a href="/cadastro" data-link class="btn btn-dark">Começar grátis</a>
       `;
@@ -681,6 +682,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
     const mobileActions = user
       ? mobileAccountActionsMarkup(user)
       : `
+        <a href="/chat" data-link class="btn btn-secondary" style="display:flex;align-items:center;justify-content:center;gap:0.5rem;">${icon("message")} Chat NutriAI</a>
         <a href="/login" data-link class="btn btn-secondary">Entrar</a>
         <a href="/cadastro" data-link class="btn btn-dark">Começar grátis</a>
       `;
@@ -1974,7 +1976,6 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
 
   function chatPage() {
     const user = getUser();
-    if (!user) return loginPage();
     const premium = isPremiumUser(user);
     const currentId = getCurrentSessionId();
     const sessions = getChatSessions();
@@ -1998,12 +1999,30 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
           </div>
           <nav class="chat-nav">
             ${chatNavLink("/chat", "message", "Chat", true)}
-            ${premium ? "" : chatNavLink("/feedbacks", "message", "Feedbacks")}
-            ${chatNavLink("/dashboard", "layout", "Dashboard")}
-            ${chatNavLink("/planos", "dumbbell", "Planos")}
-            ${chatNavLink("/calendario", "calendar", "Calendário")}
-            ${chatNavLink("/perfil", "user", getFirstName(user))}
-            <button class="chat-nav-link" data-action="logout">${icon("logout")} Sair</button>
+            ${
+              !user
+                ? `
+                  <a href="/login" data-link class="chat-nav-link" style="margin-top:auto;">Entrar</a>
+                  <a href="/cadastro" data-link class="chat-nav-link" style="color:var(--primary);font-weight:600;">Criar conta grátis</a>
+                `
+                : isProfessionalUser(user)
+                  ? `
+                    ${chatNavLink("/pacientes", "users", "Pacientes")}
+                    ${chatNavLink("/anotacoes", "fileText", "Anotações")}
+                    <div style="flex:1;"></div>
+                    ${chatNavLink("/perfil", "user", getFirstName(user))}
+                    <button class="chat-nav-link" data-action="logout">${icon("logout")} Sair</button>
+                  `
+                  : `
+                    ${premium ? "" : chatNavLink("/feedbacks", "message", "Feedbacks")}
+                    ${chatNavLink("/dashboard", "layout", "Dashboard")}
+                    ${chatNavLink("/planos", "dumbbell", "Planos")}
+                    ${chatNavLink("/calendario", "calendar", "Calendário")}
+                    <div style="flex:1;"></div>
+                    ${chatNavLink("/perfil", "user", getFirstName(user))}
+                    <button class="chat-nav-link" data-action="logout">${icon("logout")} Sair</button>
+                  `
+            }
           </nav>
         </header>
         <main class="chat-shell">
@@ -2151,7 +2170,7 @@ import { AnalyticsClient, LEGAL_PAGES } from "./modules/product.js";
   }
 
   async function loadChatHistory(sessionId = getCurrentSessionId(), force = false) {
-    if (!getToken() || !sessionId) return;
+    if (!sessionId) return;
     if (!force && state.chatHistory[sessionId]) return;
 
     try {

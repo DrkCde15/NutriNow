@@ -184,10 +184,10 @@ def _build_session_summaries(user_id, limit=50):
     return sessions
 
 @chatbot_bp.route("/chat", methods=["POST"])
-@jwt_required()
+@jwt_required(optional=True)
 def chat():
     user_id = get_jwt_identity()
-    email = _get_user_email(user_id)
+    email = _get_user_email(user_id) if user_id else "guest"
     data = request.get_json(silent=True) or {}
 
     allowed, retry_after = check_rate_limit("chat", 60, 60, user_id)
@@ -208,13 +208,20 @@ def chat():
     if len(message) > message_limit:
         return jsonify({"error": "Mensagem muito longa"}), 413
 
+    if not user_id:
+        with get_db() as (cursor, conn):
+            cursor.execute("SELECT COUNT(*) as count FROM chat_history WHERE session_id = %s AND user_id IS NULL AND message_type = 'human'", (session_id,))
+            row = cursor.fetchone()
+            if row and row["count"] >= 5:
+                return jsonify({"error": "Limite de 5 mensagens atingido. Faça o login ou crie uma conta para continuar!"}), 403
+
     agent = get_agent(session_id=session_id, user_id=user_id, email=email)
     response_text = agent.run_text(message)
     _invalidate_chat_sessions_cache(user_id)
     return jsonify({"success": True, "session_id": session_id, "response": response_text}), 200
 
 @chatbot_bp.route("/chat_history", methods=["GET"])
-@jwt_required()
+@jwt_required(optional=True)
 def chat_history():
     user_id = get_jwt_identity()
     session_id = _normalize_session_id(request.args.get("session_id") or request.headers.get("X-Session-ID"))
@@ -222,16 +229,28 @@ def chat_history():
         return jsonify({"error": "Sessao invalida"}), 400
 
     with get_db() as (cursor, conn):
-        cursor.execute(
-            """
-            SELECT message_type, content, timestamp
-            FROM chat_history
-            WHERE user_id = %s AND session_id = %s
-            ORDER BY timestamp ASC, CASE WHEN message_type = 'human' THEN 0 ELSE 1 END, id ASC
-            LIMIT 200
-            """,
-            (user_id, session_id),
-        )
+        if user_id is None:
+            cursor.execute(
+                """
+                SELECT message_type, content, timestamp
+                FROM chat_history
+                WHERE user_id IS NULL AND session_id = %s
+                ORDER BY timestamp ASC, CASE WHEN message_type = 'human' THEN 0 ELSE 1 END, id ASC
+                LIMIT 200
+                """,
+                (session_id,),
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT message_type, content, timestamp
+                FROM chat_history
+                WHERE user_id = %s AND session_id = %s
+                ORDER BY timestamp ASC, CASE WHEN message_type = 'human' THEN 0 ELSE 1 END, id ASC
+                LIMIT 200
+                """,
+                (user_id, session_id),
+            )
         rows = cursor.fetchall() or []
 
     history = [
@@ -245,9 +264,11 @@ def chat_history():
     return jsonify({"success": True, "history": history})
 
 @chatbot_bp.route("/chat_sessions", methods=["GET"])
-@jwt_required()
+@jwt_required(optional=True)
 def chat_sessions():
     user_id = get_jwt_identity()
+    if not user_id:
+        return jsonify({"success": True, "sessions": []}), 200
     try:
         cache_key = _chat_sessions_cache_key(user_id)
         cached_sessions = _chat_sessions_cache.get(cache_key)
