@@ -17,7 +17,7 @@ chatbot_bp = Blueprint("chatbot", __name__)
 
 SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 CHAT_MESSAGE_MAX_CHARS = int(os.getenv("CHAT_MESSAGE_MAX_CHARS", "8000"))
-CHAT_SESSIONS_CACHE_SECONDS = int(os.getenv("CHAT_SESSIONS_CACHE_SECONDS", "12"))
+CHAT_SESSIONS_CACHE_SECONDS = int(os.getenv("CHAT_SESSIONS_CACHE_SECONDS", "120"))
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 ALLOWED_IMAGE_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
 _chat_sessions_cache = TTLCache(ttl_seconds=CHAT_SESSIONS_CACHE_SECONDS, max_items=256)

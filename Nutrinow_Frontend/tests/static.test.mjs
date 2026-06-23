@@ -1,9 +1,9 @@
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { AnalyticsClient, LEGAL_PAGES } from "../modules/product.js";
+import { AnalyticsClient, LEGAL_PAGES } from "../js/shared/product.js";
 
-const textFiles = ["index.html", "app.js", "styles.css", "modules/product.js"];
+const textFiles = ["index.html", "js/app.js", "styles.css", "js/shared/product.js"];
 const mojibakeMarkers = ["Ã", "Â", "â€¢", "â€“", "â€”", "â€", "�"];
 
 test("frontend text files stay valid UTF-8 without mojibake markers", async () => {
@@ -18,8 +18,8 @@ test("frontend text files stay valid UTF-8 without mojibake markers", async () =
 test("app is loaded as an ES module and product module is copied by build", async () => {
   const index = await readFile(new URL("../index.html", import.meta.url), "utf8");
   const build = await readFile(new URL("../build-static.mjs", import.meta.url), "utf8");
-  assert.match(index, /<script\s+type="module"\s+src="\.\/app\.js/);
-  assert.match(build, /modules/);
+  assert.match(index, /<script\s+type="module"\s+src="\.\/js\/app\.js/);
+  assert.match(build, /js/);
 });
 
 test("legal pages expose SaaS compliance surfaces", () => {

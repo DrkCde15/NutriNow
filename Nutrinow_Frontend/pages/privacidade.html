@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="only light" />
+    <meta name="darkreader-lock" />
+    <title>Política de Privacidade - NutriNow</title>
+    <meta name="description" content="Política de privacidade e tratamento de dados do NutriNow." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" />
+    <link rel="icon" type="image/png" href="../assets/logo.png?v=20260521-tab-logo" />
+    <link rel="apple-touch-icon" href="../assets/logo.png?v=20260521-tab-logo" />
+    <link rel="stylesheet" href="../styles.css?v=20260605-index-route" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <script>
+      if (location.protocol.startsWith("http") && location.hash.startsWith("#/")) {
+        history.replaceState({}, "", (location.pathname || "/") + location.search);
+      }
+    </script>
+    <script type="module">
+      import { headerMarkup, footerMarkup, pageShell } from '../js/shared/ui.js';
+      import { migratePersistentSession, getUser } from '../js/shared/api.js';
+      import { normalizePath, getCurrentPath } from '../js/shared/utils.js';
+
+      migratePersistentSession();
+
+      function renderPage() {
+        const app = document.getElementById('app');
+        const path = normalizePath(getCurrentPath());
+        app.innerHTML = pageShell(`
+          <main class="container" style="padding:2rem 1rem;max-width:48rem;margin:0 auto;">
+            <h1>Política de Privacidade</h1>
+            <p class="text-muted">Última atualização: 03/06/2026</p>
+            <div style="margin-top:2rem;">
+              <section style="margin-bottom:1.5rem;">
+                <h2>1. Dados coletados</h2>
+                <p>Podemos tratar dados de conta, perfil físico, objetivo, rotina de dieta e treino, mensagens enviadas à NutriAI, arquivos de imagem, feedbacks e dados técnicos para segurança e analytics com consentimento.</p>
+              </section>
+              <section style="margin-bottom:1.5rem;">
+                <h2>2. Finalidades</h2>
+                <p>Usamos os dados para autenticar usuários, manter perfil e agenda, personalizar respostas da NutriAI, sincronizar eventos no Google Calendar, enviar e-mails transacionais e melhorar a experiência.</p>
+              </section>
+              <section style="margin-bottom:1.5rem;">
+                <h2>3. Compartilhamento</h2>
+                <p>Dados podem ser compartilhados com provedores necessários à operação, como infraestrutura, banco de dados, e-mail e provedor de IA, sempre limitado à finalidade de entrega do serviço.</p>
+              </section>
+              <section style="margin-bottom:1.5rem;">
+                <h2>4. Retenção</h2>
+                <p>Os dados são mantidos enquanto a conta estiver ativa ou pelo período necessário para cumprir obrigações legais.</p>
+              </section>
+              <section style="margin-bottom:1.5rem;">
+                <h2>5. Analytics</h2>
+                <p>O NutriNow usa analytics próprio e minimizado. Eventos de navegação só são enviados após consentimento explícito.</p>
+              </section>
+              <section style="margin-bottom:1.5rem;">
+                <h2>6. Segurança</h2>
+                <p>A aplicação usa hash de senha, JWT, cookies de refresh com CSRF, CORS restrito e validação de uploads.</p>
+              </section>
+              <section style="margin-bottom:1.5rem;">
+                <h2>7. Exercício de direitos</h2>
+                <p>O usuário pode solicitar acesso, correção, exclusão ou portabilidade de dados pelo canal de privacidade informado pelo controlador do projeto.</p>
+              </section>
+            </div>
+          </main>
+        `, path);
+      }
+
+      renderPage();
+    </script>
+  </body>
+</html>

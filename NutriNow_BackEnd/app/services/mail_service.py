@@ -15,7 +15,6 @@ def _smtp_timeout_seconds():
 def envoyer_email(destinatario, assunto, mensagem_html):
     remetente = (os.getenv("EMAIL_SENDER") or "").strip().strip('"').strip("'")
     senha = (os.getenv("EMAIL_PASSWORD") or "").strip().strip('"').strip("'")
-    senha = senha.replace(" ", "")
 
     if not remetente or not senha:
         logger.error("EMAIL_SENDER/EMAIL_PASSWORD nao configurados corretamente")

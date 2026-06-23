@@ -31,10 +31,36 @@ TRUTHY_VALUES = {"1", "true", "yes", "on"}
 COMMON_PASSWORDS = {
     "1234567890",
     "123456789",
+    "12345678",
     "password",
+    "password123",
     "senha123",
+    "senha1234",
     "qwerty123",
+    "qwerty12",
     "nutrinow123",
+    "nutrinow1",
+    "admin12345",
+    "teste1234",
+    "batata123",
+    "abcd1234",
+    "letmein",
+    "welcome1",
+    "iloveyou",
+    "sunshine",
+    "princess",
+    "monkey",
+    "master",
+}
+
+PASSWORD_REQUIREMENTS = {
+    "min_length": 10,
+    "require_uppercase": True,
+    "require_lowercase": True,
+    "require_digit": True,
+    "min_uppercase": 1,
+    "min_lowercase": 1,
+    "min_digit": 1,
 }
 
 _rate_limit_buckets = defaultdict(deque)
@@ -128,7 +154,7 @@ def build_allowed_origins(include_local=None):
     for origin in DEPLOYED_FRONTEND_ORIGINS:
         origins.append(origin)
 
-    if include_local:
+    if include_local and is_development():
         origins.extend(LOCAL_FRONTEND_ORIGINS)
 
     origins.extend(_configured_origins())
@@ -183,10 +209,16 @@ def validate_email(value):
 
 def validate_password(value):
     password = str(value or "")
-    if len(password) < 10:
-        return "Senha deve ter ao menos 10 caracteres"
+    if len(password) < PASSWORD_REQUIREMENTS["min_length"]:
+        return f"Senha deve ter ao menos {PASSWORD_REQUIREMENTS['min_length']} caracteres"
     if password.lower() in COMMON_PASSWORDS:
         return "Use uma senha menos comum"
+    if PASSWORD_REQUIREMENTS["require_uppercase"] and not any(c.isupper() for c in password):
+        return "Senha deve conter ao menos uma letra maiuscula"
+    if PASSWORD_REQUIREMENTS["require_lowercase"] and not any(c.islower() for c in password):
+        return "Senha deve conter ao menos uma letra minuscula"
+    if PASSWORD_REQUIREMENTS["require_digit"] and not any(c.isdigit() for c in password):
+        return "Senha deve conter ao menos um numero"
     return None
 
 

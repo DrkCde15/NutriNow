@@ -36,7 +36,8 @@ def _provided_secret(payload):
 def _webhook_secret_is_valid(payload):
     configured = _webhook_secret()
     if not configured:
-        return True
+        logger.error("CAKTO_WEBHOOK_SECRET nao configurado — webhook rejeitado por seguranca")
+        return False
     return hmac.compare_digest(str(_provided_secret(payload)), configured)
 
 

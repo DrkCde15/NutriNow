@@ -53,8 +53,8 @@ def create_app():
         os.environ.pop("OAUTHLIB_INSECURE_TRANSPORT", None)
 
     jwt_secret = _secret_or_dev_fallback("JWT_SECRET_KEY", app.secret_key)
-    jwt_minutes = int(os.getenv("JWT_ACCESS_TOKEN_MINUTES", "9999"))
-    jwt_refresh_days = int(os.getenv("JWT_REFRESH_TOKEN_DAYS", "9999"))
+    jwt_minutes = int(os.getenv("JWT_ACCESS_TOKEN_MINUTES", "15"))
+    jwt_refresh_days = int(os.getenv("JWT_REFRESH_TOKEN_DAYS", "30"))
     jwt_cookie_samesite = os.getenv("JWT_COOKIE_SAMESITE") or ("Lax" if is_development() else "None")
     max_upload_mb = int(os.getenv("MAX_UPLOAD_MB", "5"))
     upload_folder = os.getenv("UPLOAD_FOLDER", os.path.join(os.getcwd(), "uploads"))

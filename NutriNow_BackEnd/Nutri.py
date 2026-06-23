@@ -6,9 +6,8 @@ import random
 import time
 from datetime import date, datetime
 from typing import List, Optional, Dict
-import mysql.connector
 import requests
-from app.database import get_db_connection
+from app.database import get_db
 from app.services.schema_cache import get_table_columns, resolve_dieta_user_column
 
 # Configuracao de Logging
@@ -56,14 +55,6 @@ class NutritionistAgent:
         self.session_id = session_id
         self.user_id = user_id
         self.email = email
-        self._uses_default_db = mysql_config is None
-        self.db_config = mysql_config or {
-            "host": os.getenv("MYSQL_HOST"),
-            "user": os.getenv("MYSQL_USER"),
-            "password": os.getenv("MYSQL_PASSWORD"),
-            "database": os.getenv("MYSQL_DATABASE"),
-            "port": int(os.getenv("MYSQL_PORT")),
-        }
         self._user_context_cache = {"expires_at": 0, "value": ""}
         self._calendar_context_cache = {"expires_at": 0, "value": ""}
 
@@ -208,11 +199,6 @@ class NutritionistAgent:
         encoded = base64.b64encode(payload).decode("ascii")
         return f"data:{mime};base64,{encoded}"
 
-    def _get_db_connection(self):
-        if self._uses_default_db:
-            return get_db_connection()
-        return mysql.connector.connect(**self.db_config)
-
     @staticmethod
     def _to_datetime(value) -> datetime:
         if isinstance(value, datetime):
@@ -290,28 +276,22 @@ class NutritionistAgent:
         return get_table_columns(cursor, "dieta_treino")
 
     def _get_user_context(self) -> str:
-        """Busca informacoes do perfil do usuario para injetar no prompt."""
         if not self.user_id:
             return ""
-
         now = time.monotonic()
         if self._user_context_cache["expires_at"] > now:
             return self._user_context_cache["value"]
-
         try:
-            conn = self._get_db_connection()
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute(
-                """
-                SELECT IFNULL(meta, 'Nao definida') as meta,
-                       altura, peso, ja_treinou
-                FROM perfil WHERE usuario_id = %s
-                """,
-                (self.user_id,),
-            )
-            perfil = cursor.fetchone()
-            conn.close()
-
+            with get_db() as (cursor, conn):
+                cursor.execute(
+                    """
+                    SELECT IFNULL(meta, 'Nao definida') as meta,
+                           altura, peso, ja_treinou
+                    FROM perfil WHERE usuario_id = %s
+                    """,
+                    (self.user_id,),
+                )
+                perfil = cursor.fetchone()
             if perfil:
                 contexto = f"\n\n[CONTEXTO DO USUARIO]: Meta: {perfil['meta']} | "
                 contexto += f"Altura: {perfil['altura']}m | Peso: {perfil['peso']}kg | "
@@ -324,68 +304,45 @@ class NutritionistAgent:
         return ""
 
     def _get_calendar_context(self, limit: int = 12) -> str:
-        """Busca itens de dieta/treino agendados para injetar no prompt."""
         if not self.user_id:
             return ""
-
         now = time.monotonic()
         if self._calendar_context_cache["expires_at"] > now:
             return self._calendar_context_cache["value"]
-
         try:
-            conn = self._get_db_connection()
-            cursor = conn.cursor(dictionary=True)
-            columns = self._get_dieta_treino_columns(cursor)
-            if not columns:
-                conn.close()
-                return ""
-
-            user_column = self._resolve_dieta_user_column(cursor)
-            duration_expr = "duration_minutes" if "duration_minutes" in columns else "60 AS duration_minutes"
-            recurrence_type_expr = "recurrence_type" if "recurrence_type" in columns else "'none' AS recurrence_type"
-            recurrence_days_expr = "recurrence_days" if "recurrence_days" in columns else "NULL AS recurrence_days"
-            recurrence_until_expr = (
-                "DATE_FORMAT(recurrence_until, '%Y-%m-%d') AS recurrence_until"
-                if "recurrence_until" in columns
-                else "NULL AS recurrence_until"
-            )
-
-            cursor.execute(
-                f"""
-                SELECT
-                    id,
-                    tipo,
-                    title,
-                    description,
-                    time,
-                    created_at,
-                    updated_at,
-                    {duration_expr},
-                    {recurrence_type_expr},
-                    {recurrence_days_expr},
-                    {recurrence_until_expr}
-                FROM dieta_treino
-                WHERE {user_column}=%s
-                ORDER BY
-                    CASE
-                        WHEN recurrence_type = 'weekly'
-                          AND (recurrence_until IS NULL OR recurrence_until >= CURDATE()) THEN 0
-                        WHEN created_at >= NOW() THEN 1
-                        ELSE 2
-                    END,
-                    created_at ASC
-                LIMIT %s
-                """,
-                (self.user_id, limit),
-            )
-            items = cursor.fetchall() or []
-            conn.close()
-
+            with get_db() as (cursor, conn):
+                columns = self._get_dieta_treino_columns(cursor)
+                if not columns:
+                    return ""
+                user_column = self._resolve_dieta_user_column(cursor)
+                cursor.execute(
+                    f"""
+                    SELECT
+                        id, tipo, title, description, time,
+                        created_at, updated_at,
+                        duration_minutes,
+                        recurrence_type,
+                        recurrence_days,
+                        DATE_FORMAT(recurrence_until, '%%Y-%%m-%%d') AS recurrence_until
+                    FROM dieta_treino
+                    WHERE {user_column}=%s
+                    ORDER BY
+                        CASE
+                            WHEN recurrence_type = 'weekly'
+                              AND (recurrence_until IS NULL OR recurrence_until >= CURDATE()) THEN 0
+                            WHEN created_at >= NOW() THEN 1
+                            ELSE 2
+                        END,
+                        created_at ASC
+                    LIMIT %s
+                    """,
+                    (self.user_id, limit),
+                )
+                items = cursor.fetchall() or []
             if not items:
                 contexto = "\n\n[CONTEXTO DA AGENDA DO USUARIO]: Nenhum treino ou dieta agendado no NutriNow."
                 self._calendar_context_cache = {"expires_at": now + 30, "value": contexto}
                 return contexto
-
             lines = []
             for item in items:
                 tipo = str(item.get("tipo") or "").lower()
@@ -395,7 +352,6 @@ class NutritionistAgent:
                 start = self._item_start_datetime(item)
                 duration = int(item.get("duration_minutes") or 60)
                 updated_at = self._to_datetime(item.get("updated_at")).strftime("%d/%m/%Y")
-
                 parts = [
                     f"{tipo_label}: {title}",
                     f"quando: {start.strftime('%d/%m/%Y %H:%M')}",
@@ -406,7 +362,6 @@ class NutritionistAgent:
                 if description:
                     parts.append(f"descricao: {description}")
                 lines.append(f"- {' | '.join(parts)}")
-
             contexto = "\n\n[CONTEXTO DA AGENDA DO USUARIO]:\n" + "\n".join(lines)
             self._calendar_context_cache = {"expires_at": now + 30, "value": contexto}
             return contexto
@@ -416,33 +371,26 @@ class NutritionistAgent:
         return ""
 
     def get_conversation_history(self, limit: int = 10, by_user: bool = False) -> List[Dict]:
-        """Recupera o historico do MySQL."""
         history = []
         try:
-            conn = self._get_db_connection()
-            cursor = conn.cursor(dictionary=True)
-
-            query = "SELECT message_type, content, timestamp FROM chat_history WHERE "
-            params = []
-            if by_user and self.user_id:
-                query += "user_id = %s "
-                params.append(self.user_id)
-            else:
-                query += "session_id = %s "
-                params.append(self.session_id)
-
-            query += """
-                ORDER BY
-                    timestamp DESC,
-                    CASE WHEN message_type = 'ai' THEN 0 ELSE 1 END
-                LIMIT %s
-            """
-            params.append(limit)
-
-            cursor.execute(query, tuple(params))
-            rows = cursor.fetchall()
-            conn.close()
-
+            with get_db() as (cursor, conn):
+                query = "SELECT message_type, content, timestamp FROM chat_history WHERE "
+                params = []
+                if by_user and self.user_id:
+                    query += "user_id = %s "
+                    params.append(self.user_id)
+                else:
+                    query += "session_id = %s "
+                    params.append(self.session_id)
+                query += """
+                    ORDER BY
+                        timestamp DESC,
+                        CASE WHEN message_type = 'ai' THEN 0 ELSE 1 END
+                    LIMIT %s
+                """
+                params.append(limit)
+                cursor.execute(query, tuple(params))
+                rows = cursor.fetchall()
             for row in reversed(rows):
                 history.append(
                     {
@@ -460,26 +408,21 @@ class NutritionistAgent:
         self._save_messages([(message_type, content)])
 
     def _save_messages(self, messages):
-        """Salva uma ou mais mensagens no historico do MySQL."""
         if not messages:
             return
-
         try:
-            conn = self._get_db_connection()
-            cursor = conn.cursor()
-            cursor.executemany(
-                """
-                INSERT INTO chat_history (session_id, user_id, email, message_type, content)
-                VALUES (%s, %s, %s, %s, %s)
-                """,
-                [
-                    (self.session_id, self.user_id, self.email, message_type, content)
-                    for message_type, content in messages
-                ],
-            )
-            conn.commit()
-            cursor.close()
-            conn.close()
+            with get_db() as (cursor, conn):
+                cursor.executemany(
+                    """
+                    INSERT INTO chat_history (session_id, user_id, email, message_type, content)
+                    VALUES (%s, %s, %s, %s, %s)
+                    """,
+                    [
+                        (self.session_id, self.user_id, self.email, message_type, content)
+                        for message_type, content in messages
+                    ],
+                )
+                conn.commit()
             logger.info("Mensagens salvas no DB: %s", len(messages))
         except Exception as e:
             logger.error(f"Erro ao salvar mensagens no banco: {e}")

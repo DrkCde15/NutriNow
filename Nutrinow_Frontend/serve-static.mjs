@@ -37,10 +37,32 @@ function sendFile(res, filePath) {
   createReadStream(filePath).pipe(res);
 }
 
+function isApiRequest(url) {
+  const pathname = url.pathname;
+  return pathname.startsWith("/api/") || pathname.startsWith("/auth/") || pathname.startsWith("/health");
+}
+
+function isStaticFile(pathname) {
+  const ext = extname(pathname).toLowerCase();
+  return [".css", ".js", ".jpg", ".jpeg", ".png", ".svg", ".webp", ".ico", ".json"].includes(ext);
+}
+
+function resolveFilePath(basePath, pathname) {
+  // Try exact match first
+  const exact = resolve(basePath, `.${pathname}`);
+  return exact;
+}
+
+function tryFile(basePath, pathname) {
+  const exact = resolveFilePath(basePath, pathname);
+  if (exact.startsWith(basePath)) return exact;
+  return null;
+}
+
 const server = createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
   const decodedPath = decodeURIComponent(url.pathname);
-  const requestedPath = resolve(root, `.${decodedPath}`);
+  const requestedPath = resolveFilePath(root, decodedPath);
 
   if (!requestedPath.startsWith(root)) {
     res.writeHead(403);
@@ -48,6 +70,14 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  // API requests should be proxied — return 404 to let the backend handle
+  if (isApiRequest(url)) {
+    res.writeHead(404);
+    res.end("API requests should be proxied to the backend");
+    return;
+  }
+
+  // Try exact file match
   try {
     const info = await stat(requestedPath);
     if (info.isFile()) {
@@ -55,9 +85,10 @@ const server = createServer(async (req, res) => {
       return;
     }
   } catch {
-    // SPA fallback below.
+    // File not found, try alternatives
   }
 
+  // SPA fallback: serve index.html
   sendFile(res, join(root, "index.html"));
 });
 

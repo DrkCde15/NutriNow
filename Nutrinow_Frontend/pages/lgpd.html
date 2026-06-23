@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="only light" />
+    <meta name="darkreader-lock" />
+    <title>LGPD e Direitos do Titular - NutriNow</title>
+    <meta name="description" content="Direitos dos titulares de dados e conformidade com a LGPD no NutriNow." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" />
+    <link rel="icon" type="image/png" href="../assets/logo.png?v=20260521-tab-logo" />
+    <link rel="apple-touch-icon" href="../assets/logo.png?v=20260521-tab-logo" />
+    <link rel="stylesheet" href="../styles.css?v=20260605-index-route" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <script>
+      if (location.protocol.startsWith("http") && location.hash.startsWith("#/")) {
+        history.replaceState({}, "", (location.pathname || "/") + location.search);
+      }
+    </script>
+    <script type="module">
+      import { headerMarkup, footerMarkup, pageShell } from '../js/shared/ui.js';
+      import { migratePersistentSession, getUser } from '../js/shared/api.js';
+      import { normalizePath, getCurrentPath } from '../js/shared/utils.js';
+
+      migratePersistentSession();
+
+      function renderPage() {
+        const app = document.getElementById('app');
+        const path = normalizePath(getCurrentPath());
+        app.innerHTML = pageShell(`
+          <main class="container" style="padding:2rem 1rem;max-width:48rem;margin:0 auto;">
+            <h1>LGPD e Direitos do Titular</h1>
+            <p class="text-muted">Conformidade com a Lei Geral de Proteção de Dados.</p>
+            <div style="margin-top:2rem;">
+              <section style="margin-bottom:1.5rem;">
+                <h2>Direitos atendidos</h2>
+                <p>O titular pode pedir confirmação de tratamento, acesso, correção, anonimização, bloqueio, eliminação, portabilidade e revisão de decisões automatizadas.</p>
+              </section>
+              <section style="margin-bottom:1.5rem;">
+                <h2>Bases e transparência</h2>
+                <p>A operação deve documentar as bases legais usadas para conta, execução do serviço, segurança, comunicações transacionais e analytics consentido.</p>
+              </section>
+              <section style="margin-bottom:1.5rem;">
+                <h2>Dados sensíveis</h2>
+                <p>Peso, altura, objetivos de saúde, rotinas, fotos e conversas podem revelar informações sensíveis. O produto limita coleta ao necessário.</p>
+              </section>
+              <section style="margin-bottom:1.5rem;">
+                <h2>Canal do encarregado</h2>
+                <p>Antes da venda ou publicação, configure um e-mail de privacidade/encarregado para receber solicitações de titulares.</p>
+              </section>
+              <section style="margin-bottom:1.5rem;">
+                <h2>Checklist operacional</h2>
+                <p>Para produção comercial, revise termos com advogado, registre subprocessadores, defina retenção e teste exportação de dados.</p>
+              </section>
+            </div>
+          </main>
+        `, path);
+      }
+
+      renderPage();
+    </script>
+  </body>
+</html>

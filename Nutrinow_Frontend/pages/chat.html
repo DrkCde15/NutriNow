@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="only light" />
+    <meta name="darkreader-lock" />
+    <title>Chat NutriAI - NutriNow</title>
+    <meta name="description" content="Converse com a NutriAI, sua assistente de nutrição e treinos inteligente." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" />
+    <link rel="icon" type="image/png" href="../assets/logo.png?v=20260521-tab-logo" />
+    <link rel="apple-touch-icon" href="../assets/logo.png?v=20260521-tab-logo" />
+    <link rel="stylesheet" href="../styles.css?v=20260605-index-route" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <script>
+      if (location.protocol.startsWith("http") && location.hash.startsWith("#/")) {
+        history.replaceState({}, "", (location.pathname || "/") + location.search);
+      }
+    </script>
+    <script type="module">
+      import { headerMarkup, footerMarkup, pageShell } from '../js/shared/ui.js';
+      import { migratePersistentSession, getUser } from '../js/shared/api.js';
+      import { normalizePath, getCurrentPath } from '../js/shared/utils.js';
+
+      migratePersistentSession();
+
+      function renderPage() {
+        const app = document.getElementById('app');
+        const path = normalizePath(getCurrentPath());
+        app.innerHTML = pageShell(`
+          <main class="container" style="padding:0;display:flex;flex-direction:column;height:calc(100vh - 4rem);">
+            <div style="flex:1;display:flex;flex-direction:column;max-width:48rem;margin:0 auto;width:100%;padding:1rem;">
+              <div class="chat-header" style="padding:1rem 0;border-bottom:1px solid var(--border);">
+                <h1 style="font-size:1.25rem;">NutriAI</h1>
+                <p class="text-muted" style="font-size:0.875rem;">Tire dúvidas sobre nutrição, treinos e saúde.</p>
+              </div>
+              <div class="chat-messages" style="flex:1;overflow-y:auto;padding:1rem 0;">
+                <p class="text-muted" style="text-align:center;">Inicie uma conversa com a NutriAI.</p>
+              </div>
+              <div class="chat-input" style="padding:1rem 0;border-top:1px solid var(--border);">
+                <div class="input-wrap">
+                  <input class="input" type="text" placeholder="Digite sua mensagem..." />
+                  <button class="btn btn-primary" style="border-radius:0 var(--radius) var(--radius) 0;">Enviar</button>
+                </div>
+              </div>
+            </div>
+          </main>
+        `, path);
+      }
+
+      renderPage();
+    </script>
+  </body>
+</html>

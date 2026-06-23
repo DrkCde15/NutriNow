@@ -518,7 +518,7 @@ def logout():
 def refresh_session():
     user_id = get_jwt_identity()
 
-    allowed, retry_after = check_rate_limit("refresh", 120, 300, user_id)
+    allowed, retry_after = check_rate_limit("refresh", 10, 300, user_id)
     if not allowed:
         return rate_limit_response(retry_after)
 
@@ -614,7 +614,7 @@ def redefinir_senha():
     try:
         with get_db() as (cursor, conn):
             cursor.execute(
-                "SELECT usuario_id FROM redefinicao_senha WHERE token=%s AND data_expiracao > NOW()",
+                "SELECT usuario_id FROM redefinicao_senha WHERE token=%s AND data_expiracao > NOW() FOR UPDATE",
                 (_hash_reset_token(token),),
             )
             registro = cursor.fetchone()
