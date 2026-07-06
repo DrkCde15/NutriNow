@@ -1,0 +1,88 @@
+import { useState, useEffect } from 'react';
+import { useNavigate, Link, Navigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { apiRequest } from '../../api/client';
+import Icon from '../../components/Icon';
+
+interface Patient {
+  id: number;
+  nome: string;
+  email: string;
+  ultima_interacao?: string;
+  planos_ativos: number;
+}
+
+export default function Pacientes() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) { navigate('/login', { replace: true }); return; }
+    loadPatients();
+  }, []);
+
+  const loadPatients = async () => {
+    try {
+      const data = await apiRequest<Patient[]>('/pacientes');
+      setPatients(data);
+    } catch { /* ok */ }
+    setLoading(false);
+  };
+
+  if (user && user.role !== 'nutritionist' && user.role !== 'personal_trainer') {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return (
+    <main className="page-main">
+      <nav className="navbar">
+        <Link to="/" className="brand">
+          <span className="brand-logo"><img src="/logo.png" alt="NutriNow" width="32" height="32" /></span>
+          <span>Nutri<span className="text-primary">Now</span></span>
+        </Link>
+        <div className="nav-links">
+          <Link to="/chat" className="nav-link">Chat</Link>
+          <Link to="/calendario" className="nav-link">Calendário</Link>
+          <Link to="/dieta" className="nav-link">Dieta</Link>
+          <Link to="/treino" className="nav-link">Treino</Link>
+          <Link to="/dashboard" className="nav-link">Dashboard</Link>
+          <button className="btn btn-ghost" onClick={logout} style={{ fontSize: '0.85rem' }}><Icon name="logout" size={16} /> Sair</button>
+        </div>
+      </nav>
+      <div className="container" style={{ padding: '2rem 1.5rem', maxWidth: '66rem' }}>
+        <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+          <Icon name="users" />
+          Meus Pacientes
+        </h1>
+
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '2rem' }}><div className="spinner" /></div>
+        ) : patients.length === 0 ? (
+          <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
+            <Icon name="users" size={48} style={{ color: 'var(--muted-foreground)' }} />
+            <h3 style={{ margin: '1rem 0 0.5rem' }}>Nenhum paciente</h3>
+            <p className="text-muted">Quando você aceitar pacientes, eles aparecerão aqui.</p>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: '1rem' }}>
+            {patients.map(p => (
+              <Link key={p.id} to={`/pacientes/${p.id}`} className="card eq" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                <div>
+                  <div style={{ fontWeight: 700 }}>{p.nome}</div>
+                  <div className="text-muted" style={{ fontSize: '0.85rem' }}>{p.email}</div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <span className="badge badge-outline">{p.planos_ativos} planos ativos</span>
+                  {p.ultima_interacao && <span className="text-muted" style={{ fontSize: '0.78rem' }}>Última interação: {new Date(p.ultima_interacao).toLocaleDateString('pt-BR')}</span>}
+                  <Icon name="arrowRight" size={18} style={{ color: 'var(--muted-foreground)' }} />
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}

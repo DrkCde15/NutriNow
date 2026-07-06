@@ -7,3 +7,4 @@
 *.sql.gz
 *.dump
 uploads/
+*node_modules/

@@ -1,0 +1,44 @@
+import { Link } from 'react-router-dom';
+import Icon from '../../components/Icon';
+
+export default function Privacidade() {
+  return (
+    <main className="page-main">
+      <nav className="navbar">
+        <Link to="/" className="brand">
+          <span className="brand-logo"><img src="/logo.png" alt="NutriNow" width="32" height="32" /></span>
+          <span>Nutri<span className="text-primary">Now</span></span>
+        </Link>
+        <div className="nav-links">
+          <Link to="/login" className="nav-link">Login</Link>
+          <Link to="/cadastro" className="btn btn-primary" style={{ padding: '.4rem 1rem', fontSize: '.85rem' }}>Criar conta</Link>
+        </div>
+      </nav>
+      <div className="container legal-page">
+        <h1>Política de Privacidade</h1>
+        <p className="text-muted" style={{ marginBottom: '2rem' }}>Última atualização: 2025</p>
+        <section>
+          <h2>1. Dados Coletados</h2>
+          <p>Coletamos nome, e-mail, dados antropométricos (altura, peso), preferências de treino e histórico de conversas com a IA.</p>
+        </section>
+        <section>
+          <h2>2. Uso dos Dados</h2>
+          <p>Seus dados são usados para personalizar planos alimentares e de treino, melhorar a plataforma e enviar comunicações relevantes.</p>
+        </section>
+        <section>
+          <h2>3. Compartilhamento</h2>
+          <p>Não compartilhamos seus dados pessoais com terceiros, exceto quando exigido por lei ou com seu consentimento explícito.</p>
+        </section>
+        <section>
+          <h2>4. Cookies</h2>
+          <p>Utilizamos cookies essenciais para o funcionamento da plataforma. Você pode configurar seu navegador para recusá-los.</p>
+        </section>
+        <section>
+          <h2>5. Direitos do Titular</h2>
+          <p>Você pode solicitar acesso, correção ou exclusão dos seus dados a qualquer momento através do e-mail <a href="mailto:contato@nutrinow.com.br">contato@nutrinow.com.br</a>.</p>
+        </section>
+      </div>
+      <footer className="footer"><p className="text-muted" style={{ padding: '2rem 1rem' }}>© 2025 NutriNow</p></footer>
+    </main>
+  );
+}

@@ -133,7 +133,7 @@ def create_app():
             return jsonify({"status": "error", "checks": {"database": "error"}}), 503
 
     frontend_dist = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "..", "Nutrinow_Frontend", "dist")
+        os.path.join(os.path.dirname(__file__), "..", "..", "Nutrinow-Frontend", "dist")
     )
 
     @app.route("/", defaults={"path": ""}, methods=["GET"])
