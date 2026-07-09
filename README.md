@@ -2,11 +2,13 @@
 
 NutriNow e uma plataforma web para acompanhamento de nutricao, treinos e rotina saudavel com apoio da NutriAI.
 
-![Logo do projeto](Nutrinow_Frontend/assets/logo.png)
+![Logo do projeto](Nutrinow-Frontend\public\logo.png)
 
 ## Visao geral
 
-O projeto combina uma SPA estatica no frontend com uma API Flask no backend. A aplicacao permite criar conta, manter perfil fisico, registrar dietas e treinos, acompanhar progresso no dashboard, conversar com a NutriAI e sincronizar itens de rotina com o Google Calendar.
+O projeto combina uma SPA em **React + TypeScript** no frontend (buildada com Vite) com uma API Flask no backend. A aplicacao permite criar conta, manter perfil fisico, registrar dietas e treinos, acompanhar progresso no dashboard, conversar com a NutriAI, sincronizar itens de rotina com o Google Calendar e, para profissionais (nutricionistas/personal trainers), gerenciar pacientes.
+
+> **Nota:** o backend Flask tambem e capaz de servir o frontend estatico gerado em `Nutrinow-Frontend/dist/` em um unico Web Service (deploy no Render).
 
 ## Funcionalidades
 
@@ -16,11 +18,12 @@ O projeto combina uma SPA estatica no frontend com uma API Flask no backend. A a
 - Login tradicional com e-mail e senha.
 - Login com Google OAuth, criando o usuario automaticamente quando necessario.
 - Logout com limpeza de cookies/tokens e cache de agentes da NutriAI.
-- Renovacao de sessao com refresh token em cookie seguro.
+- Renovacao de sessao com refresh token em cookie seguro (com CSRF).
 - Endpoint `/me` para recuperar a conta autenticada.
 - Recuperacao e redefinicao de senha por e-mail, com token temporario salvo no MySQL.
 - Validacao de senha minima e bloqueio de senhas comuns.
 - Rate limit em fluxos sensiveis, como login, cadastro, redefinicao de senha, chat e feedback.
+- Roles de usuario: `user` (padrao), `nutritionist` e `personal_trainer` habilitam a area profissional.
 
 ### Acesso Free e Premium
 
@@ -56,20 +59,20 @@ O projeto combina uma SPA estatica no frontend com uma API Flask no backend. A a
 
 ### Google Calendar
 
-- Verificacao de status da conexao.
-- Fluxo OAuth dedicado para permissao de calendario.
+- Verificacao de status da conexao (`/calendar/google/status`).
+- Fluxo OAuth dedicado para permissao de calendario (`/calendar/google/connect` + `/calendar/google/callback`).
 - Armazenamento de access token, refresh token, escopo, expiracao e calendario ativo no MySQL.
 - Renovacao automatica do token quando possivel.
-- Sincronizacao manual de todos os itens cadastrados.
+- Sincronizacao manual de todos os itens cadastrados (`/calendar/google/sync`).
 - Criacao, atualizacao e exclusao de eventos no calendario do Google.
 - Suporte a eventos recorrentes via RRULE semanal.
-- Desconexao com remocao dos tokens e mapeamentos locais.
+- Desconexao com remocao dos tokens e mapeamentos locais (`/calendar/google/disconnect`).
 
 ### NutriAI e chat
 
 - Chat autenticado com sessoes independentes.
 - Historico persistido por usuario e sessao.
-- Listagem de conversas recentes com titulo, preview, data e quantidade de mensagens.
+- Listagem de conversas recentes (`/chat_sessions`) com titulo, preview, data e quantidade de mensagens.
 - Exclusao de sessoes de conversa.
 - Contexto automatico do perfil do usuario no prompt da NutriAI.
 - Contexto automatico da agenda de dieta/treino no prompt da NutriAI.
@@ -77,7 +80,16 @@ O projeto combina uma SPA estatica no frontend com uma API Flask no backend. A a
 - Fallback entre modelos Groq configuraveis por variavel de ambiente.
 - Retry com backoff para erros transitorios de rede, cota ou indisponibilidade.
 - Renderizacao de Markdown basico no frontend, incluindo listas, tabelas e enfases.
-- Upload de imagem no chat com analise visual real quando `GROQ_VISION_MODEL` aponta para um modelo multimodal compativel.
+- Sugestoes de mensagem (chips) exibidas acima da barra de texto quando a conversa esta vazia, enviando exemplos prontos para a NutriAI ao clicar.
+- Upload de imagem no chat com analise visual real quando `GROQ_VISION_MODEL` aponta para um modelo multimodal compativel (`/analyze_image`).
+
+### Area do profissional
+
+- Disponivel para usuarios com role `nutritionist` ou `personal_trainer`.
+- Listagem, cadastro, edicao e exclusao de pacientes (`/patients`).
+- Anotacoes por paciente (`/notes`) com CRUD completo.
+- Visualizacao e registro de dieta (`/patients/<id>/diet`) e treino (`/patients/<id>/workout`) do paciente.
+- Paginas no frontend: `Pacientes`, `PacienteDetalhe` e `Anotacoes`.
 
 ### Feedbacks
 
@@ -87,36 +99,49 @@ O projeto combina uma SPA estatica no frontend com uma API Flask no backend. A a
 - Persistencia dos feedbacks no MySQL.
 - Notificacao por e-mail para o endereco configurado em `EMAIL_SENDER`.
 
+### Analytics
+
+- Captura de eventos first-party com consentimento explicito (`/analytics/events`).
+- Armazenamento em `analytics_events` no MySQL.
+- Metadados sensiveis sao filtrados no cliente e no servidor.
+
 ## Stack
 
 ### Frontend
 
-- HTML, CSS e JavaScript puro.
-- SPA com roteamento client-side em `app.js`.
-- Scripts Node.js para servidor local, build estatico e checagem de sintaxe.
-- Assets em `Nutrinow_Frontend/assets/`.
-- Interface responsiva com paginas para landing, autenticacao, dashboard, planos, calendario, chat, perfil e feedbacks.
-- Estado de sessao salvo em `localStorage`, com compatibilidade para migrar dados antigos de `sessionStorage`.
-- Cache local para usuario autenticado, sessoes de chat e sessao atual.
-- Comunicacao com a API via `fetch`, incluindo envio automatico de JWT, refresh de sessao e tratamento centralizado de erros.
+- **React 19 + TypeScript**, buildado com **Vite 6**.
+- Roteamento client-side com **React Router 7** (`src/App.tsx`).
+- `AuthContext` (`src/context/AuthContext.tsx`) para sessao/usuario.
+- Cliente HTTP centralizado em `src/api/client.ts` com:
+  - Envio automatico de JWT no header `Authorization`.
+  - Refresh de sessao com deduplicacao (`/refresh`) e CSRF token via cookie.
+  - Tratamento centralizado de erros (`ApiError`, `NetworkError`, `TimeoutError`).
+  - Base de API resolvida automaticamente (proxy `/api` do Vite em dev, `location.origin` em producao).
+- Comunicacao com a API via `fetch`.
 - Upload de arquivos com `FormData` para o endpoint de analise de imagem.
 - Paginas de termos de uso, privacidade e LGPD com rotas publicas.
 - Analytics proprio com consentimento explicito e eventos minimizados.
-- Build proprio em `build-static.mjs`, com minificacao simples de HTML/CSS e copia de assets para `dist/`.
-- Servidor local proprio em `serve-static.mjs`, com fallback de SPA e headers de cache por tipo de arquivo.
+- Interface responsiva com paginas para landing, autenticacao, dashboard, planos, calendario, chat, perfil, feedbacks e area do profissional.
 
 ### Backend
 
-- Python + Flask.
-- Flask-Cors.
-- Flask-JWT-Extended.
-- MySQL Connector com pool de conexoes.
+- Python + Flask (factory `create_app()` em `app/__init__.py`).
+- Flask-Cors, Flask-JWT-Extended (access + refresh com CSRF).
+- MySQL Connector com pool de conexoes (`app/database.py`).
 - Werkzeug para hash de senha.
 - Requests + OAuthlib para Google OAuth e Google Calendar.
 - Groq em formato compativel com OpenAI Chat Completions para a NutriAI.
 - Gunicorn para deploy.
-- Estrutura em factory com `create_app()` e blueprints separados por dominio.
-- Blueprints principais: `auth`, `profile`, `fitness`, `calendar`, `chatbot` e `feedbacks`.
+- Blueprints separados por dominio:
+  - `auth` (cadastro, login, Google OAuth, logout, refresh, `/me`, esqueci/redefinir senha)
+  - `profile` (perfil, dashboard)
+  - `fitness` (dieta/treino CRUD)
+  - `chatbot` (chat, historico, sessoes, analise de imagem)
+  - `calendar` (Google Calendar OAuth + sync)
+  - `feedbacks`
+  - `billing` (checkout Cakto + webhook)
+  - `analytics` (eventos)
+  - `professional` (pacientes, anotacoes, dietas/treinos de paciente)
 - CORS configuravel por ambiente, com origens locais e de producao.
 - Cookies de refresh token com suporte a CSRF.
 - Headers de seguranca, incluindo `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`, CSP e HSTS em producao.
@@ -124,7 +149,6 @@ O projeto combina uma SPA estatica no frontend com uma API Flask no backend. A a
 - Endpoint `/health/ready` para checar prontidao do banco em deploy.
 - Limite de upload configuravel por `MAX_UPLOAD_MB`.
 - Cache TTL em memoria para sessoes de chat, itens de rotina e dados de conta.
-- Servimento opcional do frontend estatico gerado em `Nutrinow_Frontend/dist/`.
 
 ### Banco de dados
 
@@ -132,10 +156,11 @@ O projeto combina uma SPA estatica no frontend com uma API Flask no backend. A a
 - Schema principal em `NutriNow_BackEnd/app/services/db_schema.py`.
 - Script de inicializacao/atualizacao em `NutriNow_BackEnd/init_db.py`.
 - `NutriNow_BackEnd/SQL.txt` fica como referencia historica/manual.
-- Tabelas principais: `usuarios`, `perfil`, `redefinicao_senha`, `dieta_treino`, `chat_history`, `uploads`, `feedbacks`, `google_calendar_tokens` e `google_calendar_events`.
+- Tabelas principais: `usuarios`, `perfil`, `redefinicao_senha`, `dieta_treino`, `chat_history`, `uploads`, `feedbacks`, `google_calendar_tokens`, `google_calendar_events`, `analytics_events`, `pacientes`, `paciente_anotacoes`, `paciente_dietas` e `paciente_treinos`.
 - Relacionamentos com chaves estrangeiras e exclusao em cascata onde faz sentido, como perfil, rotina e tokens vinculados ao usuario.
 - Indices para consultas frequentes por usuario, sessao, e-mail, data e tipo de item.
-- Pool de conexoes configuravel por `MYSQL_POOL_SIZE`, com opcao de desativar via `MYSQL_DISABLE_POOL`.
+- Pool de conexoes configuravel por `MYSQL_POOL_SIZE` (padrao `10`), com opcao de desativar via `MYSQL_DISABLE_POOL`.
+- Tentativa (retry) com backoff curto ao esgotar o pool (`PoolError`), evitando falha imediata da requisicao sob concorrencia.
 - Suporte opcional a SSL no MySQL por `MYSQL_SSL_MODE` e `MYSQL_SSL_CA`.
 
 ### Integracoes e servicos
@@ -151,7 +176,7 @@ O projeto combina uma SPA estatica no frontend com uma API Flask no backend. A a
 
 - Hash de senhas com Werkzeug.
 - Validacao basica de e-mail e senha.
-- Tokens JWT em access token e refresh token.
+- Tokens JWT em access token e refresh token (com CSRF nos cookies de refresh).
 - Serializacao assinada com `itsdangerous` para estados/codigos de OAuth e tokens de redefinicao.
 - Rate limit em memoria por IP, escopo e usuario/e-mail quando aplicavel.
 - Validacao de extensao, MIME type e assinatura dos arquivos de imagem enviados.
@@ -169,16 +194,32 @@ NutriNow-2/
 |  |- requirements.txt
 |  |- Procfile
 |  |- render-build.sh
-|  `- app/
-|     |- routes/
-|     `- services/
-|- Nutrinow_Frontend/
+|  |- .env.example
+|  |- SQL.txt
+|  |- app/
+|  |  |- __init__.py        # factory create_app()
+|  |  |- database.py        # pool de conexoes MySQL
+|  |  |- security.py        # helpers de ambiente/CORS
+|  |  |- routes/            # blueprints: auth, profile, fitness, chatbot,
+|  |  |                     #   calendar, feedbacks, billing, analytics, professional
+|  |  |- services/          # db_schema, mail_service, cakto_service,
+|  |                        #   agent_service, access_control, caches, validation, ...
+|- Nutrinow-Frontend/
 |  |- index.html
-|  |- app.js
-|  |- styles.css
-|  |- build-static.mjs
-|  |- serve-static.mjs
-|  `- assets/
+|  |- package.json
+|  |- vite.config.ts        # dev server na porta 5173 com proxy /api -> :8000
+|  |- tsconfig.json
+|  |- src/
+|  |  |- main.tsx
+|  |  |- App.tsx            # rotas React Router
+|  |  |- api/client.ts      # cliente HTTP centralizado
+|  |  |- context/AuthContext.tsx
+|  |  |- hooks/
+|  |  |- components/
+|  |  |- pages/             # auth/, professional/, legal/, e paginas principais
+|  |  |- styles/
+|  |- public/
+|  `- dist/                 # build de producao (gerado)
 `- README.md
 ```
 
@@ -204,17 +245,19 @@ cd NutriNow_BackEnd
 python init_db.py
 ```
 
-O script cria ou atualiza as tabelas principais: usuarios, perfil, redefinicao de senha, dieta/treino, historico de chat, uploads, feedbacks e tabelas do Google Calendar.
+O script cria ou atualiza as tabelas principais: usuarios, perfil, redefinicao de senha, dieta/treino, historico de chat, uploads, feedbacks, tabelas do Google Calendar, analytics e as tabelas da area profissional (pacientes, anotacoes, dietas e treinos de paciente).
 
 ## Variaveis de ambiente
 
-Crie `NutriNow_BackEnd/.env`:
+Crie `NutriNow_BackEnd/.env` copiando de `NutriNow_BackEnd/.env.example`:
 
 ```env
 APP_ENV=development
 HOST=127.0.0.1
 PORT=8000
 FLASK_DEBUG=true
+FLASK_USE_RELOADER=true
+FLASK_RELOADER_TYPE=stat
 FLASK_SECRET_KEY=troque_esta_chave_por_uma_chave_grande
 JWT_SECRET_KEY=troque_esta_chave_por_uma_chave_grande
 JWT_ACCESS_TOKEN_MINUTES=9999
@@ -224,13 +267,19 @@ JWT_COOKIE_SAMESITE=Lax
 
 FRONTEND_URL=http://localhost:5173
 CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+CORS_SUPPORTS_CREDENTIALS=true
+
+TRUST_PROXY_HEADERS=false
+OAUTHLIB_INSECURE_TRANSPORT=1   # so em desenvolvimento
 
 MYSQL_HOST=localhost
 MYSQL_PORT=3306
 MYSQL_USER=root
 MYSQL_PASSWORD=sua_senha
 MYSQL_DATABASE=nutrinow2
-MYSQL_POOL_SIZE=2
+MYSQL_POOL_SIZE=10
+MYSQL_DISABLE_POOL=false
+MYSQL_SSL_MODE=disabled
 
 GROQ_API_KEY=sua_chave_groq
 GROQ_BASE_URL=https://api.groq.com/openai/v1
@@ -263,6 +312,8 @@ MAX_UPLOAD_MB=5
 VISION_IMAGE_MAX_MB=5
 UPLOAD_FOLDER=uploads
 CHAT_MESSAGE_MAX_CHARS=8000
+CHAT_SESSIONS_CACHE_SECONDS=12
+USER_ACCOUNT_CACHE_SECONDS=120
 ```
 
 Em producao, use `APP_ENV=production`, configure `FRONTEND_URL_PROD`/`CORS_ORIGINS_PROD` com HTTPS, ative `JWT_COOKIE_SECURE=true`, configure `GROQ_VISION_MODEL` com um modelo multimodal para analise real de imagens e use segredos com pelo menos 32 caracteres. `groq/compound-mini` e `groq/compound` ficam recomendados para texto/fallback. A aplicacao falha no boot se a validacao de producao encontrar configuracao insegura ou incompleta.
@@ -284,15 +335,26 @@ python App.py
 
 API local: `http://127.0.0.1:8000`
 
+### Frontend
+
+Em desenvolvimento o Vite roda na porta `5173` e faz proxy de `/api/*` para o backend em `http://127.0.0.1:8000` (ver `vite.config.ts`).
+
+```powershell
+cd Nutrinow-Frontend
+npm install
+npm run dev        # servidor de desenvolvimento (Vite) em http://localhost:5173
+npm run build      # gera dist/ (tsc -b && vite build)
+npm run preview    # serve o build de producao localmente
+```
+
 ## Testes e verificacoes
 
 Frontend:
 
 ```powershell
-cd Nutrinow_Frontend
-npm run lint
-npm test
-npm run build
+cd Nutrinow-Frontend
+npm run lint       # type-check com tsc --noEmit
+npm run build      # build de producao
 ```
 
 Backend:
@@ -313,6 +375,6 @@ Build Command: bash NutriNow_BackEnd/render-build.sh
 Start Command: gunicorn --chdir NutriNow_BackEnd App:app
 ```
 
-O script `render-build.sh` instala as dependencias Python, instala/prepara o frontend e gera `Nutrinow_Frontend/dist/`. O Flask serve esse `dist/` automaticamente pela mesma URL do backend.
+O script `render-build.sh` instala as dependencias Python, instala/prepara o frontend e gera `Nutrinow_Frontend/dist/`. O Flask serve esse `dist/` automaticamente pela mesma URL do backend (fallback de SPA em `app/__init__.py`).
 
 Nao configure **Publish Directory** nesse caso. Publish Directory e apenas para **Static Site** separado. Deixar o Root Directory vazio tambem faz mudancas no frontend dispararem deploy automatico.

@@ -1,103 +1,146 @@
-import { useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useChat } from '../hooks/useChat';
 import MessageList from '../components/MessageList';
 import ChatInput from '../components/ChatInput';
+import Navbar from '../components/Navbar';
 import Icon from '../components/Icon';
 
+const SUGGESTIONS = [
+  'Monte um cardápio de emagrecimento para 1 semana',
+  'Sugira um treino de força para fazer em casa',
+  'Quais alimentos têm mais proteína?',
+  'Como melhorar minha alimentação?',
+];
+
 export default function Chat() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const {
     messages, input, setInput, loading, error,
-    sessions, showHistory, setShowHistory, isAiTyping,
-    bottomRef, inputRef, sendMessage, newConversation,
-    loadSessions, handleKeyDown,
+    sessions, activeSessionId, isAiTyping, conversationStarted,
+    bottomRef, inputRef, sendMessage, sendImage, newConversation,
+    loadSession, deleteSession, loadSessions, handleKeyDown,
   } = useChat({ initialMessage: 'Olá! Sou a NutriAI, sua assistente de nutrição e treinos. Como posso ajudar?' });
+
+  const [query, setQuery] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (!user) { navigate('/login', { replace: true }); return; }
     loadSessions();
   }, []);
 
-  const role = user?.role;
-  const showPacientes = role === 'nutritionist' || role === 'personal_trainer';
+  const filtered = sessions.filter(s =>
+    (s.preview || s.title || '').toLowerCase().includes(query.toLowerCase())
+  );
 
   return (
-    <main className="page-main">
-      <nav className="navbar" role="navigation" aria-label="Navegação principal">
-        <Link to="/" className="brand" aria-label="Ir para o início">
-          <span className="brand-logo"><img src="/logo.png" alt="" width="32" height="32" /></span>
-          <span>Nutri<span className="text-primary">Now</span></span>
-        </Link>
-        <div className="nav-links">
-          <Link to="/calendario" className="nav-link">Calendário</Link>
-          <Link to="/dieta" className="nav-link">Dieta</Link>
-          <Link to="/treino" className="nav-link">Treino</Link>
-          <button className="btn btn-ghost" onClick={newConversation} style={{ fontSize: '0.85rem' }}>
+    <div className="chat-app">
+      <aside className={`chat-sidebar ${sidebarOpen ? 'open' : ''}`}>
+        <div className="chat-sidebar-header">
+          <button
+            className="btn btn-primary chat-new-btn"
+            onClick={() => { newConversation(); setSidebarOpen(false); }}
+          >
             <Icon name="plus" size={16} /> Nova conversa
           </button>
-          <button
-            className="btn btn-ghost"
-            onClick={() => setShowHistory(prev => !prev)}
-            style={{ fontSize: '0.85rem' }}
-            aria-expanded={showHistory}
-            aria-controls="chat-history-panel"
-          >
-            <Icon name="history" size={16} /> Histórico
-          </button>
-          <Link to="/dashboard" className="nav-link">Dashboard</Link>
-          {showPacientes && <Link to="/pacientes" className="nav-link">Pacientes</Link>}
-          <button className="btn btn-ghost" onClick={logout} style={{ fontSize: '0.85rem' }}>
-            <Icon name="logout" size={16} /> Sair
-          </button>
+          <div className="chat-search">
+            <Icon name="search" size={16} />
+            <input
+              type="text"
+              placeholder="Buscar conversas..."
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              aria-label="Buscar conversas"
+            />
+          </div>
         </div>
-      </nav>
 
-      <div className="chat-layout">
-        {showHistory && (
-          <aside id="chat-history-panel" className="chat-history" role="complementary" aria-label="Histórico de conversas">
-            <h3 style={{ margin: '0 0 1rem', fontSize: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              Histórico
-              <button className="btn btn-ghost" onClick={() => setShowHistory(false)} style={{ padding: '0.25rem' }} aria-label="Fechar histórico">
-                <Icon name="x" size={16} />
-              </button>
-            </h3>
-            {sessions.length === 0 ? (
-              <p className="text-muted" style={{ fontSize: '0.85rem' }}>Nenhuma conversa salva.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                {sessions.map(s => (
-                  <button key={s.id} className="history-item" onClick={() => { /* TODO: carregar conversa */ }}>
-                    {s.preview}
-                  </button>
-                ))}
+        <div className="chat-session-list">
+          {filtered.length === 0 ? (
+            <p className="text-muted" style={{ fontSize: '0.85rem', padding: '0.5rem' }}>
+              {query ? 'Nenhuma conversa encontrada.' : 'Nenhuma conversa salva.'}
+            </p>
+          ) : (
+            filtered.map(s => (
+              <div key={s.session_id} className="history-item-row">
+                <button
+                  className={`history-item ${activeSessionId === s.session_id ? 'active' : ''}`}
+                  onClick={() => { loadSession(s.session_id); setSidebarOpen(false); }}
+                  title={s.title || s.preview}
+                >
+                  <Icon name="message" size={14} />
+                  <span className="history-item-text">{s.preview}</span>
+                </button>
+                <button
+                  className="history-delete"
+                  onClick={() => deleteSession(s.session_id)}
+                  aria-label="Excluir conversa"
+                >
+                  <Icon name="trash" size={14} />
+                </button>
               </div>
-            )}
-          </aside>
+            ))
+          )}
+        </div>
+      </aside>
+
+      {sidebarOpen && (
+        <div className="chat-overlay" onClick={() => setSidebarOpen(false)} aria-hidden />
+      )}
+
+      <main className="chat-main-area">
+        <div className="chat-topbar">
+          <button
+            className="icon-btn chat-menu-btn"
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Abrir histórico de conversas"
+          >
+            <Icon name="menu" size={18} />
+          </button>
+          <Navbar />
+        </div>
+
+        {error && (
+          <div className="alert" role="alert" style={{ margin: '0.5rem 1rem', flexShrink: 0 }}>
+            <Icon name="alert" size={16} /> {error}
+          </div>
         )}
 
-        <div className="chat-container">
-          {error && (
-            <div className="alert" role="alert" style={{ margin: '0.5rem 1rem', flexShrink: 0 }}>
-              <Icon name="alert" size={16} /> {error}
+        <MessageList messages={messages} isAiTyping={isAiTyping} bottomRef={bottomRef} />
+
+        {!conversationStarted && (
+          <div className="chat-suggestions" aria-label="Sugestões de mensagens">
+            <span className="chat-suggestions-label">Tente perguntar:</span>
+            <div className="chat-suggestions-row">
+              {SUGGESTIONS.map(s => (
+                <button
+                  key={s}
+                  type="button"
+                  className="chat-suggestion"
+                  onClick={() => sendMessage(s)}
+                  disabled={loading}
+                >
+                  {s}
+                </button>
+              ))}
             </div>
-          )}
+          </div>
+        )}
 
-          <MessageList messages={messages} isAiTyping={isAiTyping} bottomRef={bottomRef} />
-
-          <ChatInput
-            value={input}
-            onChange={setInput}
-            onSend={() => sendMessage()}
-            onKeyDown={handleKeyDown}
-            disabled={loading}
-            inputRef={inputRef}
-          />
-        </div>
-      </div>
-    </main>
+        <ChatInput
+          value={input}
+          onChange={setInput}
+          onSend={() => sendMessage()}
+          onImage={(file) => sendImage(file)}
+          onKeyDown={handleKeyDown}
+          disabled={loading}
+          inputRef={inputRef}
+        />
+      </main>
+    </div>
   );
 }

@@ -9,9 +9,6 @@ from flask import has_request_context, jsonify, request
 
 logger = logging.getLogger(__name__)
 
-DEPLOYED_FRONTEND_ORIGINS = [
-    "https://nutrinow-app.jcesarsantana215.workers.dev",
-]
 
 PLATFORM_FRONTEND_ENV_NAMES = [
     "RENDER_EXTERNAL_URL",
@@ -140,7 +137,7 @@ def _configured_frontend_url():
         if origin:
             return origin
 
-    return LOCAL_FRONTEND_ORIGINS[0] if is_development() else DEPLOYED_FRONTEND_ORIGINS[0]
+    return LOCAL_FRONTEND_ORIGINS[0] if is_development() else None
 
 
 def build_allowed_origins(include_local=None):
@@ -151,8 +148,6 @@ def build_allowed_origins(include_local=None):
         raise RuntimeError("Variaveis de CORS nao podem usar '*'")
 
     origins = []
-    for origin in DEPLOYED_FRONTEND_ORIGINS:
-        origins.append(origin)
 
     if include_local and is_development():
         origins.extend(LOCAL_FRONTEND_ORIGINS)

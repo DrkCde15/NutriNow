@@ -55,6 +55,7 @@ const ICONS: Record<string, React.JSX.Element> = {
   plus: <><path d="M5 12h14"/><path d="M12 5v14"/></>,
   edit: <><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></>,
   x: <><path d="M18 6 6 18"/><path d="m6 6 12 12"/></>,
+  menu: <><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></>,
   calendar: <><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></>,
   clock: <><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>,
   chevronLeft: <><path d="m15 18-6-6 6-6"/></>,

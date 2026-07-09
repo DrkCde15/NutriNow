@@ -16,7 +16,17 @@ function MessageItem({ message }: { message: ChatMessage }) {
           <Icon name="sparkles" size={16} />
         </div>
       )}
-      <div className="message-content">{message.content}</div>
+      <div className="message-content">
+        {message.image && (
+          <img
+            src={message.image}
+            alt="Imagem enviada"
+            className="message-image"
+            loading="lazy"
+          />
+        )}
+        {message.content}
+      </div>
     </div>
   );
 }

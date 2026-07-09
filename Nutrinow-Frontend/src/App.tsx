@@ -10,8 +10,7 @@ import Dashboard from './pages/Dashboard';
 import Planos from './pages/Planos';
 import Calendario from './pages/Calendario';
 import Chat from './pages/Chat';
-import Dieta from './pages/Dieta';
-import Treino from './pages/Treino';
+import Rotina from './pages/Rotina';
 import Perfil from './pages/Perfil';
 import Feedbacks from './pages/Feedbacks';
 import Termos from './pages/legal/Termos';
@@ -38,8 +37,9 @@ export default function App() {
       <Route path="/dashboard" element={<PremiumRoute><Dashboard /></PremiumRoute>} />
       <Route path="/planos" element={<Planos />} />
       <Route path="/calendario" element={<PremiumRoute><Calendario /></PremiumRoute>} />
-      <Route path="/dieta" element={<PremiumRoute><Dieta /></PremiumRoute>} />
-      <Route path="/treino" element={<PremiumRoute><Treino /></PremiumRoute>} />
+      <Route path="/dieta-treino" element={<PremiumRoute><Rotina /></PremiumRoute>} />
+      <Route path="/dieta" element={<PremiumRoute><Rotina /></PremiumRoute>} />
+      <Route path="/treino" element={<PremiumRoute><Rotina /></PremiumRoute>} />
       <Route path="/chat" element={<Chat />} />
       <Route path="/perfil" element={<Perfil />} />
       <Route path="/feedbacks" element={<Feedbacks />} />

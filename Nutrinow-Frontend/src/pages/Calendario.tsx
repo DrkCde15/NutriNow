@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiRequest } from '../api/client';
 import Icon from '../components/Icon';
+import NavLink from '../components/NavLink';
 
 interface DietaTreinoItem {
   id: number;
@@ -92,11 +93,10 @@ export default function Calendario() {
           <span>Nutri<span className="text-primary">Now</span></span>
         </Link>
         <div className="nav-links">
-          <Link to="/chat" className="nav-link">Chat</Link>
-          <Link to="/dieta" className="nav-link">Dieta</Link>
-          <Link to="/treino" className="nav-link">Treino</Link>
-          <Link to="/dashboard" className="nav-link">Dashboard</Link>
-          {showPacientes && <Link to="/pacientes" className="nav-link">Pacientes</Link>}
+          <NavLink to="/chat" className="nav-link">Chat</NavLink>
+          <NavLink to="/dieta-treino" className="nav-link">Dieta-Treino</NavLink>
+          <NavLink to="/dashboard" className="nav-link">Dashboard</NavLink>
+          {showPacientes && <NavLink to="/pacientes" className="nav-link">Pacientes</NavLink>}
           <button className="btn btn-ghost" onClick={logout} style={{ fontSize: '0.85rem' }}><Icon name="logout" size={16} /> Sair</button>
         </div>
       </nav>

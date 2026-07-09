@@ -168,6 +168,7 @@ def _account_payload(user):
     return {
         "id": user["id"],
         "nome": user["nome"],
+        "sobrenome": user.get("sobrenome"),
         "email": user["email"],
         "altura": _optional_float(user.get("altura")),
         "peso": _optional_float(user.get("peso")),
@@ -481,7 +482,7 @@ def exchange_google_auth_code():
             ensure_usuario_access_columns(cursor)
             cursor.execute(
                 """
-                SELECT u.id, u.nome, u.email, u.is_premium, u.premium_expires_at, u.role, p.altura, p.peso
+            SELECT u.id, u.nome, u.sobrenome, u.email, u.is_premium, u.premium_expires_at, u.role, p.altura, p.peso
                 FROM usuarios u
                 LEFT JOIN perfil p ON u.id = p.usuario_id
                 WHERE u.id=%s

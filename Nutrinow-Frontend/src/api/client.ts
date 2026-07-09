@@ -40,6 +40,7 @@ export interface DietaTreinoItem {
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  image?: string;
 }
 
 export interface ChatResponse {
@@ -108,7 +109,7 @@ function getApiBase(): string {
       return normalized;
     }
   }
-  if (isLocalhost && location.port !== '8000') return 'http://127.0.0.1:8000';
+  if (isLocalhost && location.port !== '8000') return '/api';
   return location.origin;
 }
 

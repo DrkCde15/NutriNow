@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { apiRequest, ApiError } from '../api/client';
 import { useForm, validators } from '../hooks/useForm';
 import Icon from '../components/Icon';
+import NavLink from '../components/NavLink';
 
 const ROLE_LABELS: Record<string, string> = {
   user: 'Usuário comum',
@@ -38,9 +39,15 @@ export default function Perfil() {
 
   const loadProfile = async () => {
     try {
-      const data = await apiRequest<Record<string, unknown>>('/me');
+      const data = await apiRequest<Record<string, unknown>>('/perfil');
       if (data) updateUser(data);
-    } catch { /* ignore */ }
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        navigate('/login', { replace: true });
+        return;
+      }
+    }
     setProfileLoaded(true);
   };
 
@@ -126,12 +133,11 @@ export default function Perfil() {
           <span>Nutri<span className="text-primary">Now</span></span>
         </Link>
         <div className="nav-links">
-          <Link to="/chat" className="nav-link">Chat</Link>
-          <Link to="/calendario" className="nav-link">Calendário</Link>
-          <Link to="/dieta" className="nav-link">Dieta</Link>
-          <Link to="/treino" className="nav-link">Treino</Link>
-          <Link to="/dashboard" className="nav-link">Dashboard</Link>
-          {(user.role === 'nutritionist' || user.role === 'personal_trainer') && <Link to="/pacientes" className="nav-link">Pacientes</Link>}
+          <NavLink to="/chat" className="nav-link">Chat</NavLink>
+          <NavLink to="/calendario" className="nav-link">Calendário</NavLink>
+          <NavLink to="/dieta-treino" className="nav-link">Dieta-Treino</NavLink>
+          <NavLink to="/dashboard" className="nav-link">Dashboard</NavLink>
+          {(user.role === 'nutritionist' || user.role === 'personal_trainer') && <NavLink to="/pacientes" className="nav-link">Pacientes</NavLink>}
           <button className="btn btn-ghost" onClick={logout} style={{ fontSize: '0.85rem' }}><Icon name="logout" size={16} /> Sair</button>
         </div>
       </nav>

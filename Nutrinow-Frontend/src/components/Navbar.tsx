@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import NavLink from './NavLink';
 import Icon from './Icon';
 
 export default function Navbar() {
@@ -15,19 +16,18 @@ export default function Navbar() {
       <div className="nav-links">
         {user ? (
           <>
-            <Link to="/dashboard" className="nav-link">Dashboard</Link>
-            <Link to="/calendario" className="nav-link">Calendário</Link>
-            <Link to="/dieta" className="nav-link">Dieta</Link>
-            <Link to="/treino" className="nav-link">Treino</Link>
-            <Link to="/chat" className="nav-link">Chat</Link>
-            <Link to="/perfil" className="nav-link">Perfil</Link>
-            {showPacientes && <Link to="/pacientes" className="nav-link">Pacientes</Link>}
-            <Link to="/feedbacks" className="nav-link">Feedbacks</Link>
+            <NavLink to="/dashboard" className="nav-link">Dashboard</NavLink>
+            <NavLink to="/calendario" className="nav-link">Calendário</NavLink>
+            <NavLink to="/dieta-treino" className="nav-link">Dieta-Treino</NavLink>
+            <NavLink to="/chat" className="nav-link">Chat</NavLink>
+            <NavLink to="/perfil" className="nav-link">Perfil</NavLink>
+            {showPacientes && <NavLink to="/pacientes" className="nav-link">Pacientes</NavLink>}
+            <NavLink to="/feedbacks" className="nav-link">Feedbacks</NavLink>
             <button className="btn btn-ghost" onClick={logout} style={{ fontSize: '0.85rem' }}><Icon name="logout" size={16} /> Sair</button>
           </>
         ) : (
           <>
-            <Link to="/login" className="nav-link">Entrar</Link>
+            <NavLink to="/login" className="nav-link">Entrar</NavLink>
             <Link to="/cadastro" className="btn btn-primary" style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem' }}>Criar conta</Link>
           </>
         )}

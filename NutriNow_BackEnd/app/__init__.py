@@ -181,7 +181,7 @@ def create_app():
                 "script-src 'self'; "
                 "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
                 "font-src 'self' https://fonts.gstatic.com; "
-                "img-src 'self' data:; "
+                "img-src 'self' data: https:; "
                 "connect-src 'self' http://127.0.0.1:8000 http://localhost:8000; "
                 "frame-ancestors 'none'",
             )

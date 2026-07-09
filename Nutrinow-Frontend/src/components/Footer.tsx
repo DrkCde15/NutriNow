@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import Icon from './Icon';
+import NavLink from './NavLink';
 
 export default function Footer() {
   return (
@@ -17,18 +18,18 @@ export default function Footer() {
           </div>
           <div>
             <h4>Produto</h4>
-            <Link to="/planos" className="nav-link" style={{ display: 'block', paddingLeft: 0 }}>Planos</Link>
-            <Link to="/chat" className="nav-link" style={{ display: 'block', paddingLeft: 0 }}>NutriAI</Link>
+            <NavLink to="/planos" className="nav-link" style={{ display: 'block', paddingLeft: 0 }}>Planos</NavLink>
+            <NavLink to="/chat" className="nav-link" style={{ display: 'block', paddingLeft: 0 }}>NutriAI</NavLink>
           </div>
           <div>
             <h4>Empresa</h4>
-            <Link to="/termos" className="nav-link" style={{ display: 'block', paddingLeft: 0 }}>Termos</Link>
-            <Link to="/privacidade" className="nav-link" style={{ display: 'block', paddingLeft: 0 }}>Privacidade</Link>
-            <Link to="/lgpd" className="nav-link" style={{ display: 'block', paddingLeft: 0 }}>LGPD</Link>
+            <NavLink to="/termos" className="nav-link" style={{ display: 'block', paddingLeft: 0 }}>Termos</NavLink>
+            <NavLink to="/privacidade" className="nav-link" style={{ display: 'block', paddingLeft: 0 }}>Privacidade</NavLink>
+            <NavLink to="/lgpd" className="nav-link" style={{ display: 'block', paddingLeft: 0 }}>LGPD</NavLink>
           </div>
           <div>
             <h4>Suporte</h4>
-            <Link to="/feedbacks" className="nav-link" style={{ display: 'block', paddingLeft: 0 }}>Feedbacks</Link>
+            <NavLink to="/feedbacks" className="nav-link" style={{ display: 'block', paddingLeft: 0 }}>Feedbacks</NavLink>
           </div>
         </div>
         <div style={{ borderTop: '1px solid var(--border)', marginTop: '2rem', paddingTop: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>

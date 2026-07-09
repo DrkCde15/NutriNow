@@ -1,8 +1,10 @@
 import os
+import time
 from contextlib import contextmanager
 from threading import Lock
 import mysql.connector
 from mysql.connector import pooling
+from mysql.connector.errors import PoolError, OperationalError, InterfaceError
 
 _pool = None
 _pool_config_key = None
@@ -57,7 +59,7 @@ def _get_pool():
         if _pool is None or _pool_config_key != config_key:
             _pool = pooling.MySQLConnectionPool(
                 pool_name=os.getenv("MYSQL_POOL_NAME", "nutrinow_pool"),
-                pool_size=_env_int("MYSQL_POOL_SIZE", 2),
+                pool_size=_env_int("MYSQL_POOL_SIZE", 10),
                 pool_reset_session=_env_bool("MYSQL_POOL_RESET_SESSION", False),
                 **config,
             )
@@ -68,7 +70,18 @@ def _get_pool():
 def get_db_connection():
     if os.getenv("MYSQL_DISABLE_POOL", "").strip().lower() in {"1", "true", "yes", "on"}:
         return mysql.connector.connect(**_db_config())
-    return _get_pool().get_connection()
+
+    pool = _get_pool()
+    last_err = None
+    for attempt in range(3):
+        try:
+            return pool.get_connection()
+        except PoolError as err:
+            last_err = err
+            time.sleep(0.1 * (attempt + 1))
+    if last_err:
+        raise last_err
+    raise PoolError("Failed getting connection; pool exhausted")
 
 @contextmanager
 def get_db():
