@@ -11,6 +11,7 @@ export default function Cadastro() {
   const navigate = useNavigate();
   const [apiError, setApiError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showSenha, setShowSenha] = useState(false);
 
   const { values, errors, touched, handleChange, handleBlur, validateAll } = useForm({
     nome: { initial: '', rules: [validators.required('Informe o nome')] },
@@ -18,7 +19,7 @@ export default function Cadastro() {
     dataNascimento: { initial: '' },
     genero: { initial: 'Masculino' },
     email: { initial: '', rules: [validators.required('Informe o email'), validators.email()] },
-    senha: { initial: '', rules: [validators.required('Informe a senha'), validators.minLength(10)] },
+    senha: { initial: '', rules: [validators.required('Informe a senha'), validators.password()] },
     role: { initial: 'user' },
     meta: { initial: '' },
     jaTreinou: { initial: 'Nunca treinou' },
@@ -80,25 +81,29 @@ export default function Cadastro() {
     name: string,
     label: string,
     type: string = 'text',
-    opts?: { placeholder?: string; autoComplete?: string; min?: number; step?: string }
+    opts?: { placeholder?: string; autoComplete?: string; min?: number; step?: string },
+    trailing?: React.ReactNode
   ) => (
     <div className="field">
       <label htmlFor={`cad-${name}`}>{label}</label>
-      <input
-        id={`cad-${name}`}
-        className={`input${touched[name] && errors[name] ? ' input-error' : ''}`}
-        type={type}
-        name={name}
-        placeholder={opts?.placeholder}
-        autoComplete={opts?.autoComplete}
-        value={values[name]}
-        onChange={handleChange(name)}
-        onBlur={handleBlur(name)}
-        min={opts?.min}
-        step={opts?.step}
-        aria-invalid={!!(touched[name] && errors[name])}
-        aria-describedby={errors[name] ? `cad-${name}-err` : undefined}
-      />
+      <div className={trailing ? 'input-wrap' : undefined}>
+        <input
+          id={`cad-${name}`}
+          className={`input${touched[name] && errors[name] ? ' input-error' : ''}`}
+          type={type}
+          name={name}
+          placeholder={opts?.placeholder}
+          autoComplete={opts?.autoComplete}
+          value={values[name]}
+          onChange={handleChange(name)}
+          onBlur={handleBlur(name)}
+          min={opts?.min}
+          step={opts?.step}
+          aria-invalid={!!(touched[name] && errors[name])}
+          aria-describedby={errors[name] ? `cad-${name}-err` : undefined}
+        />
+        {trailing}
+      </div>
       {touched[name] && errors[name] && (
         <span id={`cad-${name}-err`} className="field-error" role="alert">{errors[name]}</span>
       )}
@@ -127,7 +132,12 @@ export default function Cadastro() {
           </div>
         </div>
         {renderField('email', 'Email', 'email', { placeholder: 'Email', autoComplete: 'email' })}
-        {renderField('senha', 'Senha (mín. 10 caracteres)', 'password', { autoComplete: 'new-password' })}
+        {renderField('senha', 'Senha (mín. 10 caracteres)', showSenha ? 'text' : 'password', { autoComplete: 'new-password' },
+          <button type="button" className="password-toggle" onClick={() => setShowSenha(v => !v)} aria-label={showSenha ? 'Ocultar senha' : 'Mostrar senha'} aria-pressed={showSenha}>
+            <Icon name={showSenha ? 'eyeOff' : 'eye'} size={18} />
+          </button>
+        )}
+        <p className="field-hint">A senha precisa ter ao menos 10 caracteres, com letra maiúscula, minúscula e um número.</p>
 
         <div className="role-selector-container" role="radiogroup" aria-label="Tipo de perfil">
           <span style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Você é um profissional da saúde?</span>

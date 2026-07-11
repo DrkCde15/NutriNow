@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { apiRequest, defaultAuthenticatedRoute, ApiError } from '../../api/client';
@@ -9,6 +9,7 @@ import Icon, { GoogleLogo } from '../../components/Icon';
 export default function Login() {
   const { user, login } = useAuth();
   const navigate = useNavigate();
+  const [showSenha, setShowSenha] = useState(false);
 
   const { values, errors, touched, handleChange, handleBlur, validateAll, setFieldError } = useForm({
     email: { initial: '', rules: [validators.required('Informe o email'), validators.email()] },
@@ -71,18 +72,23 @@ export default function Login() {
         </div>
         <div className="field">
           <label htmlFor="login-senha">Senha</label>
-          <input
-            id="login-senha"
-            className={`input${touched.senha && errors.senha ? ' input-error' : ''}`}
-            type="password"
-            placeholder="********"
-            autoComplete="current-password"
-            value={values.senha}
-            onChange={handleChange('senha')}
-            onBlur={handleBlur('senha')}
-            aria-invalid={!!(touched.senha && errors.senha)}
-            aria-describedby={errors.senha ? 'login-senha-err' : undefined}
-          />
+          <div className="input-wrap">
+            <input
+              id="login-senha"
+              className={`input${touched.senha && errors.senha ? ' input-error' : ''}`}
+              type={showSenha ? 'text' : 'password'}
+              placeholder="********"
+              autoComplete="current-password"
+              value={values.senha}
+              onChange={handleChange('senha')}
+              onBlur={handleBlur('senha')}
+              aria-invalid={!!(touched.senha && errors.senha)}
+              aria-describedby={errors.senha ? 'login-senha-err' : undefined}
+            />
+            <button type="button" className="password-toggle" onClick={() => setShowSenha(v => !v)} aria-label={showSenha ? 'Ocultar senha' : 'Mostrar senha'} aria-pressed={showSenha}>
+              <Icon name={showSenha ? 'eyeOff' : 'eye'} size={18} />
+            </button>
+          </div>
           {touched.senha && errors.senha && (
             <span id="login-senha-err" className="field-error" role="alert">{errors.senha}</span>
           )}

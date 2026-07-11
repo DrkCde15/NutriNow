@@ -164,4 +164,16 @@ export const validators = {
     },
     message: msg ?? `Deve estar entre ${min} e ${max}`,
   }),
+
+  password: (msg?: string): ValidationRule => ({
+    validate: (v) => {
+      if (!v) return msg ?? 'Informe a senha';
+      if (v.length < 10) return 'Senha deve ter ao menos 10 caracteres';
+      if (!/[A-Z]/.test(v)) return 'Senha deve conter ao menos uma letra maiúscula';
+      if (!/[a-z]/.test(v)) return 'Senha deve conter ao menos uma letra minúscula';
+      if (!/[0-9]/.test(v)) return 'Senha deve conter ao menos um número';
+      return undefined;
+    },
+    message: msg ?? 'Senha não atende aos requisitos',
+  }),
 };

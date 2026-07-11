@@ -8,3 +8,4 @@
 *.dump
 uploads/
 *node_modules/
+.venv/
