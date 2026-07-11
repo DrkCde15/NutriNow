@@ -154,7 +154,7 @@ def create_app():
         if os.path.isfile(index_path):
             return send_from_directory(frontend_dist, "index.html", max_age=0)
 
-        return jsonify({"error": "Frontend estatico nao encontrado. Rode npm --prefix ../Nutrinow_Frontend run build antes de iniciar o backend."}), 404
+        return jsonify({"error": "Frontend estatico nao encontrado. Rode npm --prefix ../Nutrinow-Frontend run build antes de iniciar o backend."}), 404
 
     @app.errorhandler(RequestEntityTooLarge)
     def request_entity_too_large(_error):
