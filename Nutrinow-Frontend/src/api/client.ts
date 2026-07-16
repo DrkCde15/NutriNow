@@ -54,6 +54,24 @@ export interface CheckoutResponse {
   alreadyPremium: boolean;
 }
 
+export interface Notificacao {
+  id: number;
+  dieta_treino_id: number | null;
+  tipo: 'treino' | 'dieta';
+  titulo: string;
+  mensagem: string;
+  agendado_para: string;
+  enviado_email: number;
+  lida: number;
+  recorrente: number;
+  enviado_em: string | null;
+  criado_em: string;
+}
+
+export interface NotificacoesResponse {
+  notificacoes: Notificacao[];
+}
+
 interface RequestOptions {
   method?: string;
   body?: unknown;
@@ -290,6 +308,45 @@ export function defaultAuthenticatedRoute(user: User | null): string {
   const role = user?.role;
   if (role === 'nutritionist' || role === 'personal_trainer') return '/pacientes';
   return '/';
+}
+
+export async function getNotificacoes(): Promise<Notificacao[]> {
+  const data = await apiRequest<NotificacoesResponse>('/notificacoes');
+  return Array.isArray(data?.notificacoes) ? data.notificacoes : [];
+}
+
+export async function marcarNotificacaoLida(id: number): Promise<void> {
+  await apiRequest(`/notificacoes/${id}/lida`, { method: 'POST' });
+}
+
+export interface ConviteInfo {
+  id: number;
+  nome: string;
+  email: string;
+  tipo: 'nutricionista' | 'personal_trainer';
+  foto: string | null;
+}
+
+export interface ValidarConviteResponse {
+  success: boolean;
+  valid: boolean;
+  professional: ConviteInfo;
+}
+
+export async function criarConvite(): Promise<{ token: string; expiraEm: string }> {
+  const data = await apiRequest<{ success: boolean; token: string; expiraEm: string }>('/invites', {
+    method: 'POST',
+  });
+  return { token: data.token, expiraEm: data.expiraEm };
+}
+
+export async function validarConvite(token: string): Promise<ConviteInfo | null> {
+  try {
+    const data = await apiRequest<ValidarConviteResponse>(`/invites/validate?token=${encodeURIComponent(token)}`);
+    return data.professional || null;
+  } catch {
+    return null;
+  }
 }
 
 export { getApiBase, getToken, setToken, getUser, setUser };

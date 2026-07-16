@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { apiRequest, defaultAuthenticatedRoute, ApiError } from '../../api/client';
+import { apiRequest, defaultAuthenticatedRoute, ApiError, validarConvite, type ConviteInfo } from '../../api/client';
 import { useForm, validators } from '../../hooks/useForm';
 import AuthLayout from '../../components/AuthLayout';
 import Icon, { GoogleLogo } from '../../components/Icon';
@@ -9,9 +9,18 @@ import Icon, { GoogleLogo } from '../../components/Icon';
 export default function Cadastro() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const conviteToken = searchParams.get('convite') || '';
+  const [convite, setConvite] = useState<ConviteInfo | null>(null);
   const [apiError, setApiError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showSenha, setShowSenha] = useState(false);
+
+  useEffect(() => {
+    if (conviteToken) {
+      validarConvite(conviteToken).then(setConvite);
+    }
+  }, [conviteToken]);
 
   const { values, errors, touched, handleChange, handleBlur, validateAll } = useForm({
     nome: { initial: '', rules: [validators.required('Informe o nome')] },
@@ -47,6 +56,7 @@ export default function Cadastro() {
           altura, peso,
           ja_treinou: values.jaTreinou || 'Nunca treinou',
           role: values.role,
+          convite: conviteToken || undefined,
         },
         token: '',
       });
@@ -117,6 +127,19 @@ export default function Cadastro() {
       footer={<>Já tem conta? <Link to="/login" className="text-primary" style={{ fontWeight: 800 }}>Fazer login</Link></>}
     >
       <form className="form" onSubmit={handleSubmit} noValidate>
+        {convite && (
+          <div className="convite-banner" role="note">
+            <div className="convite-avatar">
+              {convite.foto ? <img src={convite.foto} alt={convite.nome} /> : <Icon name="user" size={20} />}
+            </div>
+            <div>
+              <div className="convite-banner-title">Você foi convidado por {convite.nome}</div>
+              <div className="text-muted" style={{ fontSize: '0.8rem' }}>
+                {convite.tipo === 'personal_trainer' ? 'Personal Trainer' : 'Nutricionista'} · {convite.email}
+              </div>
+            </div>
+          </div>
+        )}
         <div className="grid-2">
           {renderField('nome', 'Nome', 'text', { placeholder: 'Nome', autoComplete: 'given-name' })}
           {renderField('sobrenome', 'Sobrenome', 'text', { placeholder: 'Sobrenome', autoComplete: 'family-name' })}

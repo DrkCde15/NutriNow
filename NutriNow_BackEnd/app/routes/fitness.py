@@ -3,8 +3,8 @@ from datetime import datetime, timedelta
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from app.database import get_db
-from app.routes.calendar import delete_google_calendar_item, sync_google_calendar_item
 from app.services.access_control import premium_required
+from app.services.notifications import agendar_notificacao_item, remover_notificacoes_item
 from app.services.runtime_cache import TTLCache
 from app.services.schema_cache import ensure_dieta_treino_schedule_columns
 
@@ -13,7 +13,6 @@ fitness_bp = Blueprint("fitness", __name__)
 
 WEEKDAY_ORDER = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
 ITEMS_CACHE_SECONDS = 20
-BLOCKING_CALENDAR_DELETE_REASONS = {"google_error", "not_connected", "server_error"}
 
 _items_cache = TTLCache(ttl_seconds=ITEMS_CACHE_SECONDS, max_items=512)
 
@@ -234,16 +233,41 @@ def add_item():
                 )
 
             item_id = cursor.lastrowid
+            cursor.execute("SELECT email FROM usuarios WHERE id=%s", (user_id,))
+            email_row = cursor.fetchone()
+            tem_email = bool(email_row and email_row.get("email"))
             conn.commit()
 
+        novo_item = {
+            "id": item_id,
+            "tipo": tipo,
+            "title": title,
+            "description": description,
+            "time": time,
+            "created_at": datetime.now(),
+            "recurrence_type": recurrence_type,
+            "recurrence_days": recurrence_days,
+            "recurrence_until": recurrence_until,
+        }
+        notificacao = None
+        try:
+            notif_id = agendar_notificacao_item(user_id, novo_item)
+            notificacao = {
+                "id": notif_id,
+                "scheduledFor": novo_item["created_at"].isoformat(),
+                "emailReminder": tem_email,
+            }
+        except Exception as exc:
+            logger.warning(f"Falha ao agendar notificacao do item {item_id}: {exc}")
+
         _invalidate_items_cache(user_id)
-        calendar_sync = sync_google_calendar_item(user_id, item_id)
         return (
             jsonify(
                 {
                     "success": True,
                     "message": "Item adicionado com sucesso!",
-                    "googleCalendar": calendar_sync,
+                    "itemId": item_id,
+                    "notification": notificacao,
                 }
             ),
             201,
@@ -341,19 +365,44 @@ def update_item(item_id):
                 )
 
             updated = cursor.rowcount
+            cursor.execute("SELECT email FROM usuarios WHERE id=%s", (user_id,))
+            email_row = cursor.fetchone()
+            tem_email = bool(email_row and email_row.get("email"))
             conn.commit()
 
         _invalidate_items_cache(user_id)
         if updated == 0:
             return jsonify({"error": "Item nao encontrado"}), 404
 
-        calendar_sync = sync_google_calendar_item(user_id, item_id)
+        item_atualizado = {
+            "id": item_id,
+            "tipo": tipo,
+            "title": title,
+            "description": description,
+            "time": time,
+            "created_at": datetime.now(),
+            "recurrence_type": recurrence_type,
+            "recurrence_days": recurrence_days,
+            "recurrence_until": recurrence_until,
+        }
+        notificacao = None
+        try:
+            notif_id = agendar_notificacao_item(user_id, item_atualizado)
+            notificacao = {
+                "id": notif_id,
+                "scheduledFor": item_atualizado["created_at"].isoformat(),
+                "emailReminder": tem_email,
+            }
+        except Exception as exc:
+            logger.warning(f"Falha ao reagendar notificacao do item {item_id}: {exc}")
+
         return (
             jsonify(
                 {
                     "success": True,
                     "message": "Item atualizado com sucesso!",
-                    "googleCalendar": calendar_sync,
+                    "itemId": item_id,
+                    "notification": notificacao,
                 }
             ),
             200,
@@ -379,20 +428,8 @@ def delete_item(item_id):
         if not item:
             return jsonify({"error": "Item nao encontrado"}), 404
 
-        calendar_delete = delete_google_calendar_item(user_id, item_id, item.get("tipo"))
-        if calendar_delete.get("reason") in BLOCKING_CALENDAR_DELETE_REASONS:
-            status_code = 409 if calendar_delete.get("reason") == "not_connected" else 502
-            return (
-                jsonify(
-                    {
-                        "error": "Falha ao excluir evento sincronizado no Google Calendar",
-                        "googleCalendar": calendar_delete,
-                    }
-                ),
-                status_code,
-            )
-
         with get_db() as (cursor, conn):
+            remover_notificacoes_item(cursor, user_id, item_id)
             cursor.execute("DELETE FROM dieta_treino WHERE id = %s AND user_id = %s", (item_id, user_id))
             deleted = cursor.rowcount
             conn.commit()
@@ -406,7 +443,7 @@ def delete_item(item_id):
                 {
                     "success": True,
                     "message": "Item excluido com sucesso!",
-                    "googleCalendar": calendar_delete,
+                    "itemId": item_id,
                 }
             ),
             200,

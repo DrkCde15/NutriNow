@@ -19,6 +19,7 @@ import Lgpd from './pages/legal/Lgpd';
 import Pacientes from './pages/professional/Pacientes';
 import PacienteDetalhe from './pages/professional/PacienteDetalhe';
 import Anotacoes from './pages/professional/Anotacoes';
+import Convidar from './pages/professional/Convidar';
 import NotFound from './pages/NotFound';
 import PremiumRoute from './components/PremiumRoute';
 
@@ -46,9 +47,10 @@ export default function App() {
       <Route path="/termos" element={<Termos />} />
       <Route path="/privacidade" element={<Privacidade />} />
       <Route path="/lgpd" element={<Lgpd />} />
-      <Route path="/pacientes" element={<PremiumRoute><Pacientes /></PremiumRoute>} />
-      <Route path="/pacientes/:id" element={<PremiumRoute><PacienteDetalhe /></PremiumRoute>} />
-      <Route path="/pacientes/:id/anotacoes" element={<PremiumRoute><Anotacoes /></PremiumRoute>} />
+      <Route path="/pacientes" element={<Pacientes />} />
+      <Route path="/pacientes/:id" element={<PacienteDetalhe />} />
+      <Route path="/pacientes/:id/anotacoes" element={<Anotacoes />} />
+      <Route path="/convidar" element={<Convidar />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

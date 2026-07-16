@@ -3,12 +3,14 @@ import { useParams, useNavigate, Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { apiRequest } from '../../api/client';
 import Icon from '../../components/Icon';
+import NotificacaoBell from '../../components/NotificacaoBell';
 
 interface Note {
   id: number;
-  titulo: string;
-  conteudo: string;
-  created_at: string;
+  patient_id: number;
+  categoria?: string;
+  content: string;
+  criado_em?: string;
 }
 
 export default function Anotacoes() {
@@ -30,9 +32,10 @@ export default function Anotacoes() {
 
   const loadNotes = async () => {
     try {
-      const data = await apiRequest<{ notes: Note[]; patient_name: string }>(`/pacientes/${id}/anotacoes`);
-      setNotes(data.notes || []);
-      setPatientName(data.patient_name || 'Paciente');
+      const data = await apiRequest<{ notes?: Note[] }>(`/notes?patient_id=${id}`);
+      const notes = Array.isArray(data?.notes) ? data.notes : [];
+      setNotes(notes);
+      if (notes.length) setPatientName(notes[0].patient_id ? `Paciente #${notes[0].patient_id}` : 'Paciente');
     } catch {
       navigate('/pacientes', { replace: true });
     }
@@ -44,11 +47,11 @@ export default function Anotacoes() {
     if (!titulo.trim() || !conteudo.trim()) return;
     setSaving(true);
     try {
-      const newNote = await apiRequest<Note>(`/pacientes/${id}/anotacoes`, { method: 'POST', body: { titulo, conteudo } });
-      setNotes(prev => [newNote, ...prev]);
+      await apiRequest(`/notes`, { method: 'POST', body: { patient_id: Number(id), categoria: titulo, content: conteudo } });
       setTitulo('');
       setConteudo('');
       setShowForm(false);
+      loadNotes();
     } catch { /* */ }
     setSaving(false);
   };
@@ -69,6 +72,8 @@ export default function Anotacoes() {
           <Link to="/pacientes" className="nav-link">Pacientes</Link>
           <Link to="/chat" className="nav-link">Chat</Link>
           <Link to="/calendario" className="nav-link">Calendário</Link>
+          <Link to="/convidar" className="nav-link">Convidar</Link>
+          <NotificacaoBell />
           <button className="btn btn-ghost" onClick={logout} style={{ fontSize: '0.85rem' }}><Icon name="logout" size={16} /> Sair</button>
         </div>
       </nav>
@@ -113,9 +118,9 @@ export default function Anotacoes() {
           <div style={{ display: 'grid', gap: '1rem' }}>
             {notes.map(n => (
               <div key={n.id} className="card eq">
-                <h3 style={{ marginBottom: '0.5rem' }}>{n.titulo}</h3>
-                <p style={{ whiteSpace: 'pre-wrap', fontSize: '0.9rem' }}>{n.conteudo}</p>
-                <span className="text-muted" style={{ fontSize: '0.78rem' }}>{new Date(n.created_at).toLocaleDateString('pt-BR')} {new Date(n.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                <h3 style={{ marginBottom: '0.5rem' }}>{n.categoria || 'Anotação'}</h3>
+                <p style={{ whiteSpace: 'pre-wrap', fontSize: '0.9rem' }}>{n.content}</p>
+                {n.criado_em && <span className="text-muted" style={{ fontSize: '0.78rem' }}>{new Date(n.criado_em).toLocaleDateString('pt-BR')} {new Date(n.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>}
               </div>
             ))}
           </div>

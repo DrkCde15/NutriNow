@@ -16,6 +16,7 @@ USUARIO_ACCESS_COLUMNS = {
     "is_premium": "ALTER TABLE usuarios ADD COLUMN is_premium TINYINT(1) NOT NULL DEFAULT 0",
     "premium_expires_at": "ALTER TABLE usuarios ADD COLUMN premium_expires_at DATETIME NULL",
     "role": f"ALTER TABLE usuarios ADD COLUMN role {USER_ROLE_ENUM_SQL} NOT NULL DEFAULT 'user'",
+    "convidado_por": "ALTER TABLE usuarios ADD COLUMN convidado_por INT NULL",
 }
 FEEDBACKS_COLUMNS = {
     "user_id": "ALTER TABLE feedbacks ADD COLUMN user_id INT NULL",
@@ -25,6 +26,30 @@ FEEDBACKS_COLUMNS = {
     "message": "ALTER TABLE feedbacks ADD COLUMN message TEXT NULL",
     "created_at": "ALTER TABLE feedbacks ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP",
 }
+PERFIL_COLUMNS = {
+    "foto": "ALTER TABLE perfil ADD COLUMN foto VARCHAR(512) NULL",
+}
+
+NOTIFICACOES_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS notificacoes (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    dieta_treino_id BIGINT NULL,
+    tipo ENUM('treino','dieta') NOT NULL DEFAULT 'treino',
+    titulo VARCHAR(255) NOT NULL,
+    mensagem TEXT NOT NULL,
+    agendado_para DATETIME NOT NULL,
+    enviado_email TINYINT(1) NOT NULL DEFAULT 0,
+    lida TINYINT(1) NOT NULL DEFAULT 0,
+    recorrente TINYINT(1) NOT NULL DEFAULT 0,
+    enviado_em DATETIME NULL,
+    criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_notificacoes_user (user_id),
+    INDEX idx_notificacoes_agendado (agendado_para, enviado_email),
+    CONSTRAINT fk_notificacoes_user
+        FOREIGN KEY (user_id) REFERENCES usuarios(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"""
 
 _table_columns_cache = {}
 _cache_lock = Lock()
@@ -166,3 +191,24 @@ def ensure_feedbacks_columns(cursor):
         cursor.execute(FEEDBACKS_COLUMNS[column])
 
     invalidate_table_columns("feedbacks")
+
+
+def ensure_perfil_columns(cursor):
+    columns = get_table_columns(cursor, "perfil")
+    missing_columns = [
+        column
+        for column in PERFIL_COLUMNS
+        if column not in columns
+    ]
+    if not missing_columns:
+        return
+
+    for column in missing_columns:
+        cursor.execute(PERFIL_COLUMNS[column])
+
+    invalidate_table_columns("perfil")
+
+
+def ensure_notificacoes_table(cursor):
+    cursor.execute(NOTIFICACOES_TABLE_SQL)
+    invalidate_table_columns("notificacoes")

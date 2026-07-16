@@ -3,18 +3,17 @@ import { useParams, useNavigate, Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { apiRequest } from '../../api/client';
 import Icon from '../../components/Icon';
+import NotificacaoBell from '../../components/NotificacaoBell';
 
 interface PatientDetail {
   id: number;
   nome: string;
-  email: string;
-  altura: number;
-  peso: number;
-  genero: string;
-  meta: string;
-  ja_treinou: string;
-  dataNascimento: string;
-  observacoes: string;
+  idade?: number;
+  altura?: number;
+  peso?: number;
+  objetivo?: string;
+  observacoes?: string;
+  criado_em?: string;
 }
 
 export default function PacienteDetalhe() {
@@ -34,9 +33,13 @@ export default function PacienteDetalhe() {
 
   const loadPatient = async () => {
     try {
-      const data = await apiRequest<PatientDetail>(`/pacientes/${id}`);
-      setPatient(data);
-      setObs(data.observacoes || '');
+      const data = await apiRequest<{ patient?: PatientDetail }>(`/patients/${id}`);
+      if (data.patient) {
+        setPatient(data.patient);
+        setObs(data.patient.observacoes || '');
+      } else {
+        navigate('/pacientes', { replace: true });
+      }
     } catch {
       navigate('/pacientes', { replace: true });
     }
@@ -46,7 +49,7 @@ export default function PacienteDetalhe() {
   const saveObs = async () => {
     setSavingObs(true);
     try {
-      await apiRequest(`/pacientes/${id}`, { method: 'PUT', body: { observacoes: obs } });
+      await apiRequest(`/patients/${id}`, { method: 'PUT', body: { observacoes: obs } });
       setObsSaved(true);
       setTimeout(() => setObsSaved(false), 2000);
     } catch { /* */ }
@@ -60,7 +63,9 @@ export default function PacienteDetalhe() {
   if (loading) return <div className="loading-screen"><div className="spinner" /></div>;
   if (!patient) return null;
 
-  const bmi = patient.altura > 0 ? patient.peso / (patient.altura * patient.altura) : 0;
+  const alturaNum = Number(patient.altura) || 0;
+  const pesoNum = Number(patient.peso) || 0;
+  const bmi = alturaNum > 0 ? pesoNum / (alturaNum * alturaNum) : 0;
 
   return (
     <main className="page-main">
@@ -73,31 +78,33 @@ export default function PacienteDetalhe() {
           <Link to="/pacientes" className="nav-link"><Icon name="arrowLeft" size={16} /> Pacientes</Link>
           <Link to="/chat" className="nav-link">Chat</Link>
           <Link to="/calendario" className="nav-link">Calendário</Link>
+          <Link to="/convidar" className="nav-link">Convidar</Link>
           <Link to="/dashboard" className="nav-link">Dashboard</Link>
+          <NotificacaoBell />
           <button className="btn btn-ghost" onClick={logout} style={{ fontSize: '0.85rem' }}><Icon name="logout" size={16} /> Sair</button>
         </div>
       </nav>
       <div className="container" style={{ padding: '2rem 1.5rem', maxWidth: '66rem' }}>
         <div className="card" style={{ marginBottom: '1.5rem' }}>
           <h1 style={{ margin: '0 0 0.25rem' }}>{patient.nome}</h1>
-          <p className="text-muted">{patient.email}</p>
+          <p className="text-muted">{patient.idade ? `${patient.idade} anos` : 'Paciente'}</p>
         </div>
 
         <div className="dash-grid">
           <div className="dash-card">
             <h3>Dados antropométricos</h3>
             <div style={{ display: 'grid', gap: '0.75rem', gridTemplateColumns: '1fr 1fr' }}>
-              <div><span className="text-muted">Altura</span><div style={{ fontWeight: 700 }}>{patient.altura.toFixed(2)} m</div></div>
-              <div><span className="text-muted">Peso</span><div style={{ fontWeight: 700 }}>{patient.peso.toFixed(1)} kg</div></div>
-              <div><span className="text-muted">IMC</span><div style={{ fontWeight: 700 }}>{bmi.toFixed(1)}</div></div>
-              <div><span className="text-muted">Gênero</span><div style={{ fontWeight: 700 }}>{patient.genero}</div></div>
+              <div><span className="text-muted">Altura</span><div style={{ fontWeight: 700 }}>{patient.altura ? `${Number(patient.altura).toFixed(2)} m` : '—'}</div></div>
+              <div><span className="text-muted">Peso</span><div style={{ fontWeight: 700 }}>{patient.peso ? `${Number(patient.peso).toFixed(1)} kg` : '—'}</div></div>
+              {alturaNum > 0 && pesoNum > 0 && (
+                <div><span className="text-muted">IMC</span><div style={{ fontWeight: 700 }}>{bmi.toFixed(1)}</div></div>
+              )}
             </div>
           </div>
           <div className="dash-card">
             <h3>Informações</h3>
-            <p><span className="text-muted">Meta:</span> {patient.meta}</p>
-            <p><span className="text-muted">Experiência:</span> {patient.ja_treinou}</p>
-            {patient.dataNascimento && <p><span className="text-muted">Nascimento:</span> {new Date(patient.dataNascimento).toLocaleDateString('pt-BR')}</p>}
+            <p><span className="text-muted">Objetivo:</span> {patient.objetivo || '—'}</p>
+            {patient.criado_em && <p><span className="text-muted">Cadastro:</span> {new Date(patient.criado_em).toLocaleDateString('pt-BR')}</p>}
           </div>
         </div>
 

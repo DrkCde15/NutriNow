@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { apiRequest } from '../api/client';
+import { apiRequest, getNotificacoes, marcarNotificacaoLida, type Notificacao } from '../api/client';
 import Icon from '../components/Icon';
 import NavLink from '../components/NavLink';
 
@@ -39,11 +39,26 @@ export default function Calendario() {
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
 
   useEffect(() => {
     if (!user) { navigate('/login', { replace: true }); return; }
     loadEntries();
+    loadNotificacoes();
   }, []);
+
+  const loadNotificacoes = async () => {
+    try {
+      setNotificacoes(await getNotificacoes());
+    } catch { /* ok */ }
+  };
+
+  const marcarLida = async (id: number) => {
+    setNotificacoes(prev => prev.map(n => (n.id === id ? { ...n, lida: 1 } : n)));
+    try {
+      await marcarNotificacaoLida(id);
+    } catch { /* ok */ }
+  };
 
   const loadEntries = async () => {
     try {
@@ -131,6 +146,40 @@ export default function Calendario() {
                 })}
               </div>
             </div>
+
+            {notificacoes.length > 0 && (
+              <section className="card" style={{ marginTop: '1.5rem' }}>
+                <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Icon name="bell" />
+                  Lembretes
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {notificacoes.map(n => (
+                    <div
+                      key={n.id}
+                      className="card eq"
+                      style={{ padding: '0.85rem', opacity: n.lida ? 0.6 : 1, cursor: n.lida ? 'default' : 'pointer' }}
+                      onClick={() => { if (!n.lida) marcarLida(n.id); }}
+                    >
+                      <div style={{ fontWeight: 600, display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
+                        <span>{n.titulo}</span>
+                        {!n.lida && <span className="badge badge-outline" style={{ fontSize: '0.7rem' }}>novo</span>}
+                      </div>
+                      <p className="text-muted" style={{ marginTop: '0.25rem', fontSize: '0.85rem' }}>{n.mensagem}</p>
+                      <div style={{ marginTop: '0.35rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <span className="badge badge-outline">{n.tipo === 'dieta' ? 'Dieta' : 'Treino'}</span>
+                        <span className="text-muted" style={{ fontSize: '0.75rem' }}>
+                          {new Date(n.agendado_para).toLocaleString('pt-BR')}
+                        </span>
+                        {n.enviado_email ? (
+                          <span className="badge badge-outline" style={{ fontSize: '0.7rem' }}>e-mail enviado</span>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
 
             {selectedDate && (
               <section className="card" style={{ marginTop: '1.5rem' }}>

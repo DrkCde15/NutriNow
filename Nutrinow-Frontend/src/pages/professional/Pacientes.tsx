@@ -4,13 +4,16 @@ import { useAuth } from '../../context/AuthContext';
 import { apiRequest } from '../../api/client';
 import Icon from '../../components/Icon';
 import NavLink from '../../components/NavLink';
+import NotificacaoBell from '../../components/NotificacaoBell';
 
 interface Patient {
   id: number;
   nome: string;
-  email: string;
+  email?: string;
   ultima_interacao?: string;
-  planos_ativos: number;
+  criado_em?: string;
+  planos_ativos?: number;
+  objetivo?: string;
 }
 
 export default function Pacientes() {
@@ -26,8 +29,8 @@ export default function Pacientes() {
 
   const loadPatients = async () => {
     try {
-      const data = await apiRequest<Patient[]>('/pacientes');
-      setPatients(data);
+      const data = await apiRequest<{ patients?: Patient[] }>('/patients');
+      setPatients(Array.isArray(data?.patients) ? data.patients : []);
     } catch { /* ok */ }
     setLoading(false);
   };
@@ -46,8 +49,10 @@ export default function Pacientes() {
         <div className="nav-links">
           <NavLink to="/chat" className="nav-link">Chat</NavLink>
           <NavLink to="/calendario" className="nav-link">Calendário</NavLink>
+          <NavLink to="/convidar" className="nav-link">Convidar</NavLink>
           <NavLink to="/dieta-treino" className="nav-link">Dieta-Treino</NavLink>
           <NavLink to="/dashboard" className="nav-link">Dashboard</NavLink>
+          <NotificacaoBell />
           <button className="btn btn-ghost" onClick={logout} style={{ fontSize: '0.85rem' }}><Icon name="logout" size={16} /> Sair</button>
         </div>
       </nav>
@@ -71,11 +76,11 @@ export default function Pacientes() {
               <Link key={p.id} to={`/pacientes/${p.id}`} className="card eq" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
                   <div style={{ fontWeight: 700 }}>{p.nome}</div>
-                  <div className="text-muted" style={{ fontSize: '0.85rem' }}>{p.email}</div>
+                  <div className="text-muted" style={{ fontSize: '0.85rem' }}>{p.email || p.objetivo || 'Paciente'}</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <span className="badge badge-outline">{p.planos_ativos} planos ativos</span>
-                  {p.ultima_interacao && <span className="text-muted" style={{ fontSize: '0.78rem' }}>Última interação: {new Date(p.ultima_interacao).toLocaleDateString('pt-BR')}</span>}
+                  {typeof p.planos_ativos === 'number' && <span className="badge badge-outline">{p.planos_ativos} planos ativos</span>}
+                  {(p.ultima_interacao || p.criado_em) && <span className="text-muted" style={{ fontSize: '0.78rem' }}>Desde: {new Date(p.ultima_interacao || p.criado_em!).toLocaleDateString('pt-BR')}</span>}
                   <Icon name="arrowRight" size={18} style={{ color: 'var(--muted-foreground)' }} />
                 </div>
               </Link>

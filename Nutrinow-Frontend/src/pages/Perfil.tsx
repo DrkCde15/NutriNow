@@ -95,6 +95,10 @@ export default function Perfil() {
 
   const fullName = `${user.nome || ''} ${user.sobrenome || ''}`.trim() || 'Usuário NutriNow';
   const initials = fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+  const convidadoPor = (user as any)?.convidadoPor as
+    | { id: number; nome: string; email: string; tipo: string; foto: string | null }
+    | null
+    | undefined;
 
   const renderField = (
     name: string,
@@ -161,6 +165,24 @@ export default function Perfil() {
             </div>
           </div>
         </section>
+
+        {convidadoPor && (
+          <section className="card" style={{ marginBottom: '1.5rem' }}>
+            <div className="convite-banner" role="note">
+              <div className="convite-avatar">
+                {convidadoPor.foto ? <img src={convidadoPor.foto} alt={convidadoPor.nome} /> : <Icon name="user" size={20} />}
+              </div>
+              <div>
+                <div className="convite-banner-title">
+                  Você foi convidado por {convidadoPor.nome}
+                </div>
+                <div className="text-muted" style={{ fontSize: '0.8rem' }}>
+                  {convidadoPor.tipo === 'personal_trainer' ? 'Personal Trainer' : 'Nutricionista'} · {convidadoPor.email}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
 
         <section className="card">
           <div className="form-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>

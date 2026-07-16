@@ -244,6 +244,7 @@ def cadastro():
     peso = data.get("peso")
     ja_treinou = data.get("ja_treinou", "Nunca treinou")
     role = normalize_role(data.get("role"))
+    convite_token = str(data.get("convite") or "").strip()
 
     if not all([nome, sobrenome, email, senha]):
         return jsonify({"error": "Campos obrigatorios ausentes"}), 400
@@ -260,12 +261,29 @@ def cadastro():
         senha_hash = generate_password_hash(senha)
         with get_db() as (cursor, conn):
             ensure_usuario_access_columns(cursor)
+
+            convidado_por = None
+            if convite_token:
+                cursor.execute(
+                    """
+                    SELECT id, professional_id, usado_por, expira_em
+                    FROM convites_profissionais
+                    WHERE token = %s
+                    LIMIT 1
+                    """,
+                    (convite_token,),
+                )
+                convite = cursor.fetchone()
+                agora = datetime.utcnow()
+                if convite and not convite.get("usado_por") and (convite.get("expira_em") or agora) >= agora:
+                    convidado_por = convite.get("professional_id")
+
             cursor.execute(
                 """
-                INSERT INTO usuarios (nome, sobrenome, data_nascimento, genero, email, senha, role)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO usuarios (nome, sobrenome, data_nascimento, genero, email, senha, role, convidado_por)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """,
-                (nome, sobrenome, data_nascimento, genero, email, senha_hash, role),
+                (nome, sobrenome, data_nascimento, genero, email, senha_hash, role, convidado_por),
             )
 
             user_id = cursor.lastrowid
@@ -276,6 +294,12 @@ def cadastro():
                 """,
                 (user_id, meta, altura, peso, ja_treinou),
             )
+
+            if convidado_por:
+                cursor.execute(
+                    "UPDATE convites_profissionais SET usado_por = %s WHERE token = %s",
+                    (user_id, convite_token),
+                )
 
             conn.commit()
 

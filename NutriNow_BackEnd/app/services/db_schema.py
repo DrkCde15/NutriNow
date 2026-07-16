@@ -14,9 +14,12 @@ CORE_SCHEMA_SQL = [
         is_premium TINYINT(1) NOT NULL DEFAULT 0,
         premium_expires_at DATETIME NULL,
         role ENUM('user','nutritionist','personal_trainer') NOT NULL DEFAULT 'user',
+        convidado_por INT NULL,
         criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_usuarios_email (email),
-        INDEX idx_usuarios_premium (is_premium, premium_expires_at)
+        INDEX idx_usuarios_premium (is_premium, premium_expires_at),
+        CONSTRAINT fk_usuarios_convidado_por
+            FOREIGN KEY (convidado_por) REFERENCES usuarios(id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     """,
     """
@@ -26,6 +29,7 @@ CORE_SCHEMA_SQL = [
         altura DECIMAL(5,2) NULL,
         peso DECIMAL(5,2) NULL,
         ja_treinou VARCHAR(255) DEFAULT 'Nunca treinou',
+        foto VARCHAR(512) NULL,
         CONSTRAINT fk_perfil_usuario
             FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -60,6 +64,26 @@ CORE_SCHEMA_SQL = [
         INDEX idx_dieta_treino_user_tipo_created (user_id, tipo, created_at),
         INDEX idx_dieta_treino_user_updated (user_id, updated_at),
         CONSTRAINT fk_dieta_treino_user
+            FOREIGN KEY (user_id) REFERENCES usuarios(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS notificacoes (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        dieta_treino_id BIGINT NULL,
+        tipo ENUM('treino','dieta') NOT NULL DEFAULT 'treino',
+        titulo VARCHAR(255) NOT NULL,
+        mensagem TEXT NOT NULL,
+        agendado_para DATETIME NOT NULL,
+        enviado_email TINYINT(1) NOT NULL DEFAULT 0,
+        lida TINYINT(1) NOT NULL DEFAULT 0,
+        recorrente TINYINT(1) NOT NULL DEFAULT 0,
+        enviado_em DATETIME NULL,
+        criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_notificacoes_user (user_id),
+        INDEX idx_notificacoes_agendado (agendado_para, enviado_email),
+        CONSTRAINT fk_notificacoes_user
             FOREIGN KEY (user_id) REFERENCES usuarios(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     """,
@@ -109,38 +133,6 @@ CORE_SCHEMA_SQL = [
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     """,
     """
-    CREATE TABLE IF NOT EXISTS google_calendar_tokens (
-        user_id INT PRIMARY KEY,
-        access_token TEXT NOT NULL,
-        refresh_token TEXT NULL,
-        token_type VARCHAR(40) DEFAULT 'Bearer',
-        scope TEXT NULL,
-        expires_at DATETIME NULL,
-        calendar_id VARCHAR(255) NOT NULL DEFAULT 'primary',
-        connected_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        CONSTRAINT fk_google_calendar_tokens_user
-            FOREIGN KEY (user_id) REFERENCES usuarios(id) ON DELETE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS google_calendar_events (
-        id BIGINT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT NOT NULL,
-        dieta_treino_id BIGINT NOT NULL,
-        tipo ENUM('treino','dieta') NOT NULL,
-        google_event_id VARCHAR(255) NOT NULL,
-        synced_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        UNIQUE KEY uq_google_calendar_event_item (user_id, dieta_treino_id, tipo),
-        INDEX idx_google_calendar_events_user (user_id),
-        CONSTRAINT fk_google_calendar_events_user
-            FOREIGN KEY (user_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-        CONSTRAINT fk_google_calendar_events_item
-            FOREIGN KEY (dieta_treino_id) REFERENCES dieta_treino(id) ON DELETE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    """,
-    """
     CREATE TABLE IF NOT EXISTS analytics_events (
         id BIGINT AUTO_INCREMENT PRIMARY KEY,
         user_id INT NULL,
@@ -170,6 +162,22 @@ CORE_SCHEMA_SQL = [
         INDEX idx_pacientes_professional (professional_id),
         CONSTRAINT fk_pacientes_professional
             FOREIGN KEY (professional_id) REFERENCES usuarios(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS convites_profissionais (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        professional_id INT NOT NULL,
+        token VARCHAR(64) NOT NULL,
+        usado_por INT NULL,
+        criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
+        expira_em DATETIME NOT NULL,
+        INDEX idx_convites_token (token),
+        INDEX idx_convites_professional (professional_id),
+        CONSTRAINT fk_convites_professional
+            FOREIGN KEY (professional_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        CONSTRAINT fk_convites_usado_por
+            FOREIGN KEY (usado_por) REFERENCES usuarios(id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     """,
     """

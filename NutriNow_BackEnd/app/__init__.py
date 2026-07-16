@@ -12,12 +12,15 @@ from app.routes.chatbot import chatbot_bp
 from app.routes.profile import profile_bp
 from app.routes.fitness import fitness_bp
 from app.routes.feedbacks import feedback_bp
-from app.routes.calendar import google_calendar_bp
 from app.routes.analytics import analytics_bp
 from app.routes.billing import billing_bp
 from app.routes.professional import professional_bp
+from app.routes.notifications import notifications_bp
+from app.routes.invites import invites_bp
 from app.database import get_db
 from app.security import build_allowed_origins, env_flag, is_development
+from apscheduler.schedulers.background import BackgroundScheduler
+from app.services.notifications import disparar_notificacoes_vencidas
 from app.services.production_checks import validate_production_environment
 
 logger = logging.getLogger(__name__)
@@ -112,10 +115,25 @@ def create_app():
     app.register_blueprint(profile_bp)
     app.register_blueprint(fitness_bp)
     app.register_blueprint(feedback_bp)
-    app.register_blueprint(google_calendar_bp)
     app.register_blueprint(analytics_bp)
     app.register_blueprint(billing_bp)
     app.register_blueprint(professional_bp)
+    app.register_blueprint(notifications_bp)
+    app.register_blueprint(invites_bp)
+
+    if not app.config.get("TESTING"):
+        scheduler = BackgroundScheduler(timezone="UTC")
+        scheduler.add_job(
+            disparar_notificacoes_vencidas,
+            "interval",
+            minutes=1,
+            id="disparar_notificacoes_vencidas",
+            replace_existing=True,
+        )
+        try:
+            scheduler.start()
+        except Exception as exc:
+            logger.warning(f"Nao foi possivel iniciar o scheduler de notificacoes: {exc}")
 
     @app.route("/health", methods=["GET"])
     def health():

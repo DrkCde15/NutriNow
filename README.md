@@ -6,7 +6,7 @@ NutriNow e uma plataforma web para acompanhamento de nutricao, treinos e rotina 
 
 ## Visao geral
 
-O projeto combina uma SPA em **React + TypeScript** no frontend (buildada com Vite) com uma API Flask no backend. A aplicacao permite criar conta, manter perfil fisico, registrar dietas e treinos, acompanhar progresso no dashboard, conversar com a NutriAI, sincronizar itens de rotina com o Google Calendar e, para profissionais (nutricionistas/personal trainers), gerenciar pacientes.
+O projeto combina uma SPA em **React + TypeScript** no frontend (buildada com Vite) com uma API Flask no backend. A aplicacao permite criar conta, manter perfil fisico, registrar dietas e treinos, acompanhar progresso no dashboard, conversar com a NutriAI, receber lembretes por notificacoes internas (in-app e e-mail) e, para profissionais (nutricionistas/personal trainers), convidar pacientes e gerenciar pacientes.
 
 > **Nota:** o backend Flask tambem e capaz de servir o frontend estatico gerado em `Nutrinow-Frontend/dist/` em um unico Web Service (deploy no Render).
 
@@ -27,10 +27,11 @@ O projeto combina uma SPA em **React + TypeScript** no frontend (buildada com Vi
 
 ### Acesso Free e Premium
 
-- Contas novas entram como `free` por padrao.
-- Contas free podem acessar Login, Cadastro, Perfil, Chat NutriAI, Feedbacks, Termos de Uso, Privacidade e LGPD.
-- Dashboard, dietas/treinos e Google Calendar exigem conta premium.
-- Ao clicar em atalhos premium com conta free, o frontend exibe um modal com as opcoes Pagar e Fechar.
+- Contas novas entram como gratuitas por padrao.
+- Contas gratuitas podem acessar Login, Cadastro, Perfil, Chat NutriAI, Feedbacks, Termos de Uso, Privacidade e LGPD.
+- Funcionalidades gratuitas para todos: notificacoes (campainha in-app), convite de pacientes e area do profissional (pacientes e anotacoes).
+- Dashboard, dietas/treinos e notificacoes por e-mail exigem conta premium.
+- A pagina de Planos (`/planos`) apresenta comparativo Gratis vs Premium, FAQ e botao de checkout.
 - O botao Pagar chama `/billing/checkout`, que gera o link da Cakto com `refId=nutrinow_user_<id>`.
 - O webhook `/billing/webhook/cakto` ativa premium somente apos validar o pedido como pago na API da Cakto.
 - A pagina de retorno para pagamento aprovado fica em `/pagamento-aprovado`, com alias `/pagamento-sucesso`.
@@ -55,18 +56,16 @@ O projeto combina uma SPA em **React + TypeScript** no frontend (buildada com Vi
 - Duracao configuravel por item.
 - Recorrencia semanal com selecao de dias da semana e data final opcional.
 - Calendario mensal no frontend com expansao de eventos recorrentes.
-- Sincronizacao automatica com Google Calendar ao criar, editar ou excluir itens, quando a conta estiver conectada.
+- Lembretes da rotina exibidos no calendario e na campainha de notificacoes.
 
-### Google Calendar
+### Notificacoes (agenda interna)
 
-- Verificacao de status da conexao (`/calendar/google/status`).
-- Fluxo OAuth dedicado para permissao de calendario (`/calendar/google/connect` + `/calendar/google/callback`).
-- Armazenamento de access token, refresh token, escopo, expiracao e calendario ativo no MySQL.
-- Renovacao automatica do token quando possivel.
-- Sincronizacao manual de todos os itens cadastrados (`/calendar/google/sync`).
-- Criacao, atualizacao e exclusao de eventos no calendario do Google.
-- Suporte a eventos recorrentes via RRULE semanal.
-- Desconexao com remocao dos tokens e mapeamentos locais (`/calendar/google/disconnect`).
+- Agenda interna substitui o Google Calendar: sem OAuth externo.
+- Ao criar/editar/excluir itens de dieta/treino, o backend agenda uma notificacao (`notifications` service).
+- Notificacoes in-app listadas na campainha do header (`/notificacoes`) e marcadas como lidas (`/notificacoes/<id>/lida`).
+- Envio de e-mail agendado (quando a conta e premium) com idempotencia via flag `enviado_email`.
+- Job do APScheduler (`disparar_notificacoes_vencidas`) a cada minuto dispara e-mails vencidos.
+- Recorrencia: ao enviar, o item e reagendado para a proxima ocorrencia (recorrencia semanal).
 
 ### NutriAI e chat
 
@@ -86,10 +85,12 @@ O projeto combina uma SPA em **React + TypeScript** no frontend (buildada com Vi
 ### Area do profissional
 
 - Disponivel para usuarios com role `nutritionist` ou `personal_trainer`.
+- **Convite de pacientes**: o profissional gera um link de convite (`POST /invites`) e o paciente que se cadastra com `?convite=<token>` e associado a `usuarios.convidado_por`. A validade e consultada em `GET /invites/validate`.
 - Listagem, cadastro, edicao e exclusao de pacientes (`/patients`).
 - Anotacoes por paciente (`/notes`) com CRUD completo.
 - Visualizacao e registro de dieta (`/patients/<id>/diet`) e treino (`/patients/<id>/workout`) do paciente.
-- Paginas no frontend: `Pacientes`, `PacienteDetalhe` e `Anotacoes`.
+- Paginas no frontend: `Pacientes`, `PacienteDetalhe`, `Anotacoes` e `Convidar` (todas gratuitas para profissionais).
+- O perfil do paciente exibe "quem te convidou" (`convidadoPor`) e a foto do profissional (`perfil.foto`).
 
 ### Feedbacks
 
@@ -135,9 +136,10 @@ O projeto combina uma SPA em **React + TypeScript** no frontend (buildada com Vi
 - Blueprints separados por dominio:
   - `auth` (cadastro, login, Google OAuth, logout, refresh, `/me`, esqueci/redefinir senha)
   - `profile` (perfil, dashboard)
-  - `fitness` (dieta/treino CRUD)
+  - `fitness` (dieta/treino CRUD + agendamento de notificacoes)
   - `chatbot` (chat, historico, sessoes, analise de imagem)
-  - `calendar` (Google Calendar OAuth + sync)
+  - `notifications` (listar e marcar notificacoes)
+  - `invites` (gerar/validar convite de profissional)
   - `feedbacks`
   - `billing` (checkout Cakto + webhook)
   - `analytics` (eventos)
@@ -156,7 +158,7 @@ O projeto combina uma SPA em **React + TypeScript** no frontend (buildada com Vi
 - Schema principal em `NutriNow_BackEnd/app/services/db_schema.py`.
 - Script de inicializacao/atualizacao em `NutriNow_BackEnd/init_db.py`.
 - `NutriNow_BackEnd/SQL.txt` fica como referencia historica/manual.
-- Tabelas principais: `usuarios`, `perfil`, `redefinicao_senha`, `dieta_treino`, `chat_history`, `uploads`, `feedbacks`, `google_calendar_tokens`, `google_calendar_events`, `analytics_events`, `pacientes`, `paciente_anotacoes`, `paciente_dietas` e `paciente_treinos`.
+- Tabelas principais: `usuarios`, `perfil`, `redefinicao_senha`, `dieta_treino`, `notificacoes`, `chat_history`, `uploads`, `feedbacks`, `analytics_events`, `pacientes`, `paciente_anotacoes`, `paciente_dietas`, `paciente_treinos` e `convites_profissionais`.
 - Relacionamentos com chaves estrangeiras e exclusao em cascata onde faz sentido, como perfil, rotina e tokens vinculados ao usuario.
 - Indices para consultas frequentes por usuario, sessao, e-mail, data e tipo de item.
 - Pool de conexoes configuravel por `MYSQL_POOL_SIZE` (padrao `10`), com opcao de desativar via `MYSQL_DISABLE_POOL`.
@@ -166,10 +168,10 @@ O projeto combina uma SPA em **React + TypeScript** no frontend (buildada com Vi
 ### Integracoes e servicos
 
 - Google OAuth para login social.
-- Google Calendar API para criar, atualizar e excluir eventos de rotina.
 - Cakto para checkout premium e webhook de confirmacao de pagamento.
-- SMTP para recuperacao de senha e notificacao de feedbacks.
+- SMTP para recuperacao de senha, notificacao de feedbacks e envio de lembretes agendados.
 - Groq API para respostas da NutriAI.
+- APScheduler para disparo agendado de notificacoes/e-mails.
 - `python-dotenv` para carregar variaveis de ambiente em desenvolvimento.
 
 ### Seguranca e confiabilidade
@@ -201,7 +203,8 @@ NutriNow-2/
 |  |  |- database.py        # pool de conexoes MySQL
 |  |  |- security.py        # helpers de ambiente/CORS
 |  |  |- routes/            # blueprints: auth, profile, fitness, chatbot,
-|  |  |                     #   calendar, feedbacks, billing, analytics, professional
+|  |  |                     #   notifications, invites, feedbacks, billing,
+|  |  |                     #   analytics, professional
 |  |  |- services/          # db_schema, mail_service, cakto_service,
 |  |                        #   agent_service, access_control, caches, validation, ...
 |- Nutrinow-Frontend/
@@ -245,7 +248,7 @@ cd NutriNow_BackEnd
 python init_db.py
 ```
 
-O script cria ou atualiza as tabelas principais: usuarios, perfil, redefinicao de senha, dieta/treino, historico de chat, uploads, feedbacks, tabelas do Google Calendar, analytics e as tabelas da area profissional (pacientes, anotacoes, dietas e treinos de paciente).
+O script cria ou atualiza as tabelas principais: usuarios, perfil, redefinicao de senha, dieta/treino, notificacoes, historico de chat, uploads, feedbacks, analytics e as tabelas da area profissional (pacientes, anotacoes, dietas, treinos de paciente e convites). Tabelas e colunas novas tambem sao criadas dinamicamente em bancos ja existentes via `schema_cache`.
 
 ## Variaveis de ambiente
 
@@ -293,9 +296,6 @@ GROQ_TEMPERATURE=0.7
 GOOGLE_CLIENT_ID=seu_google_client_id
 GOOGLE_CLIENT_SECRET=seu_google_client_secret
 GOOGLE_LOGIN_REDIRECT_URI=http://127.0.0.1:8000/auth/callback
-GOOGLE_CALENDAR_REDIRECT_URI=http://127.0.0.1:8000/calendar/google/callback
-GOOGLE_CALENDAR_TIMEZONE=America/Sao_Paulo
-GOOGLE_CALENDAR_EVENT_DURATION_MINUTES=60
 
 CAKTO_CLIENT_ID=seu_cakto_client_id
 CAKTO_CLIENT_SECRET=seu_cakto_client_secret
@@ -361,7 +361,7 @@ Backend:
 
 ```powershell
 cd NutriNow_BackEnd
-python -m unittest discover tests
+python -m pytest            # suiter de testes (24+ verificacoes de integracao)
 python -m compileall .
 ```
 

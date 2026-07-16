@@ -40,6 +40,7 @@ class FakeCursor:
         self.item = item
         self.deleted_rows = deleted_rows
         self.rowcount = 0
+        self.lastrowid = 1
         self._next_result = None
 
     def execute(self, query, params=None):
@@ -52,6 +53,9 @@ class FakeCursor:
 
     def fetchone(self):
         return self._next_result
+
+    def fetchall(self):
+        return []
 
 
 class FeedbackFakeCursor:
@@ -281,7 +285,7 @@ class RouteIntegrationTest(unittest.TestCase):
         self.assertEqual(response.status_code, 401)
         get_db.assert_not_called()
 
-    def test_delete_item_removes_google_event_before_local_row(self):
+    def test_delete_item_removes_local_row(self):
         app = create_test_app(fitness_bp)
         operations = []
         cursor = FakeCursor(operations, item={"id": 55, "tipo": "treino"})
@@ -290,25 +294,17 @@ class RouteIntegrationTest(unittest.TestCase):
         def fake_get_db():
             return FakeDb(cursor, conn)
 
-        def fake_calendar_delete(user_id, item_id, tipo=None):
-            operations.append(("calendar_delete", user_id, item_id, tipo))
-            self.assertFalse(
-                any(op[0] == "sql" and op[1].startswith("DELETE FROM dieta_treino") for op in operations)
-            )
-            return {"deleted": True, "calendarId": "primary"}
-
         with patch("app.services.access_control.user_has_premium", return_value=True), patch(
             "app.routes.fitness.get_db", side_effect=fake_get_db
-        ), patch("app.routes.fitness.delete_google_calendar_item", side_effect=fake_calendar_delete):
+        ):
             response = app.test_client().delete("/dieta-treino/55", headers=auth_header(app))
 
         self.assertEqual(response.status_code, 200)
-        labels = [op[0] if op[0] != "sql" else op[1] for op in operations]
-        calendar_index = labels.index("calendar_delete")
-        delete_index = next(index for index, label in enumerate(labels) if label.startswith("DELETE FROM dieta_treino"))
-        self.assertLess(calendar_index, delete_index)
+        self.assertTrue(
+            any(op[0] == "sql" and op[1].startswith("DELETE FROM dieta_treino") for op in operations)
+        )
 
-    def test_delete_item_blocks_local_delete_when_google_delete_fails(self):
+    def test_delete_item_succeeds_without_calendar_integration(self):
         app = create_test_app(fitness_bp)
         operations = []
         cursor = FakeCursor(operations, item={"id": 55, "tipo": "treino"})
@@ -316,14 +312,11 @@ class RouteIntegrationTest(unittest.TestCase):
 
         with patch("app.services.access_control.user_has_premium", return_value=True), patch(
             "app.routes.fitness.get_db", return_value=FakeDb(cursor, conn)
-        ), patch(
-            "app.routes.fitness.delete_google_calendar_item",
-            return_value={"deleted": False, "reason": "google_error", "error": "API indisponivel"},
         ):
             response = app.test_client().delete("/dieta-treino/55", headers=auth_header(app))
 
-        self.assertEqual(response.status_code, 502)
-        self.assertFalse(any(op[0] == "sql" and op[1].startswith("DELETE FROM dieta_treino") for op in operations))
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(any(op[0] == "sql" and op[1].startswith("DELETE FROM dieta_treino") for op in operations))
 
     def test_billing_checkout_adds_user_ref_to_cakto_link(self):
         app = create_test_app(billing_bp)
@@ -428,6 +421,321 @@ class RouteIntegrationTest(unittest.TestCase):
         self.assertEqual(response.get_json()["reason"], "order_not_paid")
         self.assertFalse(any(op[0] == "sql" and op[1].startswith("UPDATE usuarios") for op in operations))
         self.assertNotIn(("commit",), operations)
+
+
+class NotifFakeCursor:
+    def __init__(self, operations, rows=None, rowcount=1, lastrowid=1):
+        self.operations = operations
+        self.rows = rows or []
+        self.rowcount = rowcount
+        self.lastrowid = lastrowid
+        self._next_result = None
+
+    def execute(self, query, params=None):
+        normalized = " ".join(query.split())
+        self.operations.append(("sql", normalized, params))
+        if normalized.startswith("SELECT email FROM usuarios"):
+            self._next_result = {"email": "user@example.com"}
+        elif normalized.startswith("SELECT id, email, is_premium, premium_expires_at FROM usuarios"):
+            self._next_result = None
+
+    def fetchone(self):
+        return self._next_result
+
+    def fetchall(self):
+        return self.rows
+
+
+class NotificationsTests(unittest.TestCase):
+    def test_create_item_returns_notification_contract(self):
+        app = create_test_app(fitness_bp)
+        operations = []
+        cursor = FakeCursor(operations, item={"id": 99, "tipo": "treino"})
+        cursor.lastrowid = 99
+        conn = FakeConn(operations)
+        fake_notif = {"id": 123, "scheduledFor": "2026-07-16T08:00:00"}
+
+        with patch("app.services.access_control.user_has_premium", return_value=True), patch(
+            "app.routes.fitness.get_db", return_value=FakeDb(cursor, conn)
+        ), patch("app.routes.fitness.agendar_notificacao_item", return_value=123):
+            response = app.test_client().post(
+                "/dieta-treino",
+                headers=auth_header(app),
+                json={
+                    "tipo": "treino",
+                    "title": "Pernal",
+                    "description": "Agachamento",
+                    "time": "08:00",
+                    "date": "2026-07-16",
+                },
+            )
+
+        self.assertEqual(response.status_code, 201)
+        data = response.get_json()
+        self.assertEqual(data["itemId"], 99)
+        self.assertIsInstance(data["notification"], dict)
+        self.assertEqual(data["notification"]["id"], 123)
+        self.assertIn("scheduledFor", data["notification"])
+
+    def test_disparo_is_idempotent(self):
+        from app.services import notifications as notif_module
+
+        rows = [
+            {
+                "id": 1,
+                "user_id": 7,
+                "dieta_treino_id": 99,
+                "tipo": "treino",
+                "titulo": "Lembrete",
+                "mensagem": "Treino",
+                "recorrente": 0,
+            }
+        ]
+        operations = []
+
+        with patch.object(notif_module, "get_db") as get_db, patch(
+            "app.services.notifications.envoyer_email", return_value=True
+        ) as send_mail:
+            cursor = NotifFakeCursor(operations, rows=rows, rowcount=1)
+            conn = FakeConn(operations)
+            get_db.return_value = FakeDb(cursor, conn)
+
+            enviadas_1 = notif_module.disparar_notificacoes_vencidas()
+            self.assertEqual(enviadas_1, 1)
+            send_mail.assert_called_once()
+
+            cursor2 = NotifFakeCursor(operations, rows=rows, rowcount=0)
+            conn2 = FakeConn(operations)
+            get_db.return_value = FakeDb(cursor2, conn2)
+
+            enviadas_2 = notif_module.disparar_notificacoes_vencidas()
+            self.assertEqual(enviadas_2, 0)
+            self.assertEqual(send_mail.call_count, 1)
+
+        update_ops = [
+            op for op in operations
+            if op[0] == "sql" and op[1].startswith("UPDATE notificacoes SET enviado_email=1")
+        ]
+        self.assertTrue(update_ops)
+        self.assertIn("enviado_email=0", update_ops[0][1])
+
+    def test_disparo_recorrente_reagenda(self):
+        from app.services import notifications as notif_module
+
+        rows = [
+            {
+                "id": 5,
+                "user_id": 7,
+                "dieta_treino_id": 99,
+                "tipo": "treino",
+                "titulo": "Lembrete",
+                "mensagem": "Treino",
+                "recorrente": 1,
+            }
+        ]
+        operations = []
+
+        with patch.object(notif_module, "get_db") as get_db, patch(
+            "app.services.notifications.envoyer_email", return_value=True
+        ):
+            cursor = NotifFakeCursor(operations, rows=rows, rowcount=1)
+            conn = FakeConn(operations)
+            get_db.return_value = FakeDb(cursor, conn)
+
+            enviadas = notif_module.disparar_notificacoes_vencidas()
+
+        self.assertEqual(enviadas, 1)
+        insert_ops = [
+            op for op in operations
+            if op[0] == "sql"
+            and op[1].startswith("INSERT INTO notificacoes")
+        ]
+        self.assertTrue(insert_ops, "Esperado reagendamento para recorrente")
+
+    def test_get_notificacoes_returns_list(self):
+        from app.routes.notifications import notifications_bp
+
+        app = create_test_app(notifications_bp)
+        operations = []
+        linhas = [
+            {
+                "id": 10,
+                "dieta_treino_id": 99,
+                "tipo": "treino",
+                "titulo": "Lembrete de Treino: Pernal",
+                "mensagem": "Nao esqueca do seu treino",
+                "agendado_para": "2026-07-16 08:00:00",
+                "enviado_email": 0,
+                "lida": 0,
+                "recorrente": 1,
+                "enviado_em": None,
+                "criado_em": "2026-07-16 07:00:00",
+            }
+        ]
+        cursor = NotifFakeCursor(operations, rows=linhas)
+        conn = FakeConn(operations)
+
+        with patch("app.services.access_control.user_has_premium", return_value=True), patch(
+            "app.routes.notifications.get_db", return_value=FakeDb(cursor, conn)
+        ):
+            response = app.test_client().get("/notificacoes", headers=auth_header(app))
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(len(data["notificacoes"]), 1)
+        self.assertEqual(data["notificacoes"][0]["id"], 10)
+        self.assertEqual(data["notificacoes"][0]["tipo"], "treino")
+
+    def test_create_item_sem_email_marca_email_reminder_false(self):
+        app = create_test_app(fitness_bp)
+        operations = []
+        cursor = FakeCursor(operations, item={"id": 99, "tipo": "treino"})
+        cursor.lastrowid = 99
+        conn = FakeConn(operations)
+
+        with patch("app.services.access_control.user_has_premium", return_value=True), patch(
+            "app.routes.fitness.get_db", return_value=FakeDb(cursor, conn)
+        ), patch("app.routes.fitness.agendar_notificacao_item", return_value=123):
+            response = app.test_client().post(
+                "/dieta-treino",
+                headers=auth_header(app),
+                json={
+                    "tipo": "treino",
+                    "title": "Pernal",
+                    "description": "Agachamento",
+                    "time": "08:00",
+                    "date": "2026-07-16",
+                },
+            )
+
+        self.assertEqual(response.status_code, 201)
+        data = response.get_json()
+        self.assertIsNotNone(data["notification"])
+        self.assertFalse(data["notification"]["emailReminder"])
+
+
+class InviteMemoryCursor:
+    def __init__(self, operations, convites=None, usuarios=None):
+        self.operations = operations
+        self.convites = convites if convites is not None else []
+        self.usuarios = usuarios if usuarios is not None else []
+        self.rowcount = 0
+        self.lastrowid = 1
+        self._next_result = None
+
+    def execute(self, query, params=None):
+        normalized = " ".join(query.split())
+        self.operations.append(("sql", normalized, params))
+        if normalized.startswith("INSERT INTO convites_profissionais"):
+            self.convites.append({
+                "id": len(self.convites) + 1,
+                "professional_id": params[0],
+                "token": params[1],
+                "usado_por": None,
+                "expira_em": params[2],
+            })
+            self.lastrowid = self.convites[-1]["id"]
+        elif normalized.startswith("SELECT id, professional_id, usado_por, expira_em FROM convites_profissionais"):
+            token = params[0]
+            convite = next((c for c in self.convites if c["token"] == token), None)
+            self._next_result = self._convite_com_profissional(convite)
+        elif "FROM convites_profissionais" in normalized and "c.usado_por" in normalized:
+            token = params[0]
+            convite = next((c for c in self.convites if c["token"] == token), None)
+            self._next_result = self._convite_com_profissional(convite)
+        elif normalized.startswith("UPDATE convites_profissionais SET usado_por"):
+            for c in self.convites:
+                if c["token"] == params[1]:
+                    c["usado_por"] = params[0]
+        elif normalized.startswith("INSERT INTO usuarios"):
+            self._next_result = None
+
+    def fetchone(self):
+        return self._next_result
+
+    def _convite_com_profissional(self, convite):
+        if not convite:
+            return None
+        expira = convite.get("expira_em")
+        if isinstance(expira, str):
+            try:
+                expira = datetime.strptime(expira, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                expira = None
+        return dict(convite, nome="Dra. Ana", email="ana@ex.com", role="nutritionist", foto=None, expira_em=expira)
+
+    def fetchall(self):
+        return []
+
+
+class InviteTests(unittest.TestCase):
+    def test_criar_e_validar_convite(self):
+        from app.routes.invites import invites_bp
+
+        app = create_test_app(invites_bp)
+        operations = []
+        cursor = InviteMemoryCursor(operations)
+        conn = FakeConn(operations)
+
+        with patch("app.services.access_control.user_role", return_value="nutritionist"), patch(
+            "app.routes.invites.get_db", return_value=FakeDb(cursor, conn)
+        ):
+            create = app.test_client().post("/invites", headers=auth_header(app))
+            self.assertEqual(create.status_code, 201)
+            token = create.get_json()["token"]
+
+            validate = app.test_client().get(f"/invites/validate?token={token}")
+            self.assertEqual(validate.status_code, 200)
+            data = validate.get_json()
+            self.assertTrue(data["valid"])
+            self.assertEqual(data["professional"]["tipo"], "nutricionista")
+
+    def test_validar_convite_inexistente(self):
+        from app.routes.invites import invites_bp
+
+        app = create_test_app(invites_bp)
+        operations = []
+        cursor = InviteMemoryCursor(operations)
+        conn = FakeConn(operations)
+
+        with patch("app.routes.invites.get_db", return_value=FakeDb(cursor, conn)):
+            response = app.test_client().get("/invites/validate?token=naoexiste")
+            self.assertEqual(response.status_code, 404)
+
+    def test_cadastro_com_convite_associa_convidado_por(self):
+        from app.routes.auth import auth_bp
+
+        app = create_test_app(auth_bp)
+        operations = []
+        convites = [{
+            "id": 1, "professional_id": 7, "token": "tok123", "usado_por": None,
+            "expira_em": "2099-01-01 00:00:00",
+        }]
+        cursor = InviteMemoryCursor(operations, convites=convites, usuarios=[{"id": 1}])
+        conn = FakeConn(operations)
+
+        with patch("app.routes.auth.check_rate_limit", return_value=(True, None)), patch(
+            "app.routes.auth.ensure_usuario_access_columns"
+        ), patch("app.services.account_cache.set_cached_account"), patch(
+            "app.routes.auth.get_db", return_value=FakeDb(cursor, conn)
+        ):
+            response = app.test_client().post(
+                "/cadastro",
+                json={
+                    "nome": "Joao", "sobrenome": "Silva",
+                    "email": "joao@example.com", "senha": "Senha12345",
+                    "convite": "tok123",
+                },
+            )
+
+        self.assertEqual(response.status_code, 201)
+        insert_ops = [
+            op for op in operations
+            if op[0] == "sql" and op[1].startswith("INSERT INTO usuarios")
+        ]
+        self.assertTrue(insert_ops, "Esperado INSERT em usuarios")
+        params = insert_ops[0][2]
+        self.assertIn(7, params, "convidado_por deve ser o professional_id")
 
 
 if __name__ == "__main__":

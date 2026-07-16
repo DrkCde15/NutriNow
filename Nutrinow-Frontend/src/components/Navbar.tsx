@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import NavLink from './NavLink';
 import Icon from './Icon';
+import NotificacaoBell from './NotificacaoBell';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -22,7 +23,10 @@ export default function Navbar() {
             <NavLink to="/chat" className="nav-link">Chat</NavLink>
             <NavLink to="/perfil" className="nav-link">Perfil</NavLink>
             {showPacientes && <NavLink to="/pacientes" className="nav-link">Pacientes</NavLink>}
-            <NavLink to="/feedbacks" className="nav-link">Feedbacks</NavLink>
+            {showPacientes && <NavLink to="/convidar" className="nav-link">Convidar</NavLink>}
+
+            <NotificacaoBell />
+
             <button className="btn btn-ghost" onClick={logout} style={{ fontSize: '0.85rem' }}><Icon name="logout" size={16} /> Sair</button>
           </>
         ) : (
@@ -35,3 +39,4 @@ export default function Navbar() {
     </nav>
   );
 }
+

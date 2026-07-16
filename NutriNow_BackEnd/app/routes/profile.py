@@ -6,7 +6,7 @@ from app.database import get_db
 from app.security import validate_email
 from app.services.access_control import premium_required
 from app.services.account_cache import invalidate_cached_account
-from app.services.schema_cache import resolve_dieta_user_column
+from app.services.schema_cache import resolve_dieta_user_column, ensure_perfil_columns
 
 logger = logging.getLogger(__name__)
 profile_bp = Blueprint("profile", __name__)
@@ -167,6 +167,7 @@ def get_perfil():
     user_id = get_jwt_identity()
     try:
         with get_db() as (cursor, conn):
+            ensure_perfil_columns(cursor)
             cursor.execute(
                 """
                 SELECT
@@ -175,10 +176,12 @@ def get_perfil():
                     u.genero,
                     u.email,
                     u.data_nascimento,
+                    u.convidado_por,
                     IFNULL(p.meta, 'Nao definida') AS meta,
                     p.altura,
                     p.peso,
-                    p.ja_treinou
+                    p.ja_treinou,
+                    p.foto
                 FROM usuarios u
                 LEFT JOIN perfil p ON u.id = p.usuario_id
                 WHERE u.id = %s
@@ -188,6 +191,28 @@ def get_perfil():
             user = cursor.fetchone()
             if not user:
                 return jsonify({"error": "Usuario nao encontrado"}), 404
+
+            convidado_por_info = None
+            if user.get("convidado_por"):
+                cursor.execute(
+                    """
+                    SELECT u.nome, u.email, u.role, p.foto
+                    FROM usuarios u
+                    LEFT JOIN perfil p ON p.usuario_id = u.id
+                    WHERE u.id = %s
+                    LIMIT 1
+                    """,
+                    (user["convidado_por"],),
+                )
+                prof = cursor.fetchone()
+                if prof:
+                    convidado_por_info = {
+                        "id": user["convidado_por"],
+                        "nome": prof.get("nome"),
+                        "email": prof.get("email"),
+                        "tipo": "personal_trainer" if prof.get("role") == "personal_trainer" else "nutricionista",
+                        "foto": prof.get("foto"),
+                    }
 
             return (
                 jsonify(
@@ -204,6 +229,8 @@ def get_perfil():
                         "altura": float(user["altura"]) if user["altura"] else None,
                         "peso": float(user["peso"]) if user["peso"] else None,
                         "ja_treinou": user["ja_treinou"] or "Nunca treinou",
+                        "foto": user.get("foto"),
+                        "convidadoPor": convidado_por_info,
                     }
                 ),
                 200,
@@ -230,6 +257,7 @@ def update_perfil():
     altura = data.get("altura")
     peso = data.get("peso")
     ja_treinou = data.get("ja_treinou")
+    foto = data.get("foto")
 
     if raw_email and not email:
         return jsonify({"error": "Informe um email valido"}), 400
@@ -249,6 +277,7 @@ def update_perfil():
 
     try:
         with get_db() as (cursor, conn):
+            ensure_perfil_columns(cursor)
             if any([nome, sobrenome, genero, email, data_nascimento]):
                 query_parts = []
                 params = []
@@ -286,6 +315,9 @@ def update_perfil():
                 if ja_treinou is not None:
                     update_fields.append("ja_treinou=%s")
                     update_params.append(ja_treinou)
+                if foto is not None:
+                    update_fields.append("foto=%s")
+                    update_params.append(foto[:512] if foto else None)
 
                 if update_fields:
                     update_params.append(user_id)
@@ -295,8 +327,8 @@ def update_perfil():
                     )
             else:
                 cursor.execute(
-                    "INSERT INTO perfil (usuario_id, meta, altura, peso, ja_treinou) VALUES (%s, %s, %s, %s, %s)",
-                    (user_id, meta, altura, peso, ja_treinou),
+                    "INSERT INTO perfil (usuario_id, meta, altura, peso, ja_treinou, foto) VALUES (%s, %s, %s, %s, %s, %s)",
+                    (user_id, meta, altura, peso, ja_treinou, foto[:512] if foto else None),
                 )
             conn.commit()
             invalidate_cached_account(user_id)
