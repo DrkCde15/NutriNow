@@ -427,14 +427,24 @@ class NutritionistAgent:
         except Exception as e:
             logger.error(f"Erro ao salvar mensagens no banco: {e}")
 
+    def _get_exercise_context(self) -> str:
+        try:
+            from app.services.exercises_service import get_exercise_context
+            return get_exercise_context(max_exercises=200)
+        except Exception as e:
+            logger.warning(f"Nao foi possivel carregar catalogo de exercicios: {e}")
+            return ""
+
     def run_text(self, text: str) -> str:
         """Processa uma mensagem de texto usando Groq."""
         try:
             user_context = self._get_user_context()
             calendar_context = self._get_calendar_context()
+            exercise_context = self._get_exercise_context()
             chat_history = self.get_conversation_history(limit=6)
 
-            messages: List[Dict[str, str]] = [{"role": "system", "content": f"{SYSTEM_PROMPT}{user_context}{calendar_context}"}]
+            system_content = f"{SYSTEM_PROMPT}{user_context}{calendar_context}{exercise_context}"
+            messages: List[Dict[str, str]] = [{"role": "system", "content": system_content}]
             for msg in chat_history:
                 role = "user" if msg["role"] == "user" else "assistant"
                 messages.append({"role": role, "content": msg["content"]})
@@ -466,6 +476,7 @@ class NutritionistAgent:
         try:
             user_context = self._get_user_context()
             calendar_context = self._get_calendar_context()
+            exercise_context = self._get_exercise_context()
             data_url = self._image_to_data_url(file_path)
             prompt = (
                 "Analise a imagem enviada pelo usuario no contexto de nutricao. "
@@ -473,8 +484,9 @@ class NutritionistAgent:
                 "Se a imagem nao for de alimento, diga isso claramente. "
                 "Inclua alertas de incerteza e sugestoes praticas para melhorar a refeicao."
             )
+            system_content = f"{SYSTEM_PROMPT}{user_context}{calendar_context}{exercise_context}"
             messages: List[Dict] = [
-                {"role": "system", "content": f"{SYSTEM_PROMPT}{user_context}{calendar_context}"},
+                {"role": "system", "content": system_content},
                 {
                     "role": "user",
                     "content": [

@@ -17,6 +17,7 @@ from app.routes.billing import billing_bp
 from app.routes.professional import professional_bp
 from app.routes.notifications import notifications_bp
 from app.routes.invites import invites_bp
+from app.routes.exercises import exercises_bp
 from app.database import get_db
 from app.security import build_allowed_origins, env_flag, is_development
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -120,8 +121,14 @@ def create_app():
     app.register_blueprint(professional_bp)
     app.register_blueprint(notifications_bp)
     app.register_blueprint(invites_bp)
+    app.register_blueprint(exercises_bp)
 
     if not app.config.get("TESTING"):
+        from app.services.exercises_service import ensure_loaded as _ensure_exercises
+        try:
+            _ensure_exercises()
+        except Exception as exc:
+            logger.warning(f"Nao foi possivel carregar exercises dataset: {exc}")
         scheduler = BackgroundScheduler(timezone="UTC")
         scheduler.add_job(
             disparar_notificacoes_vencidas,
