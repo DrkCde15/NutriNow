@@ -60,7 +60,7 @@ O projeto combina uma SPA em **React + TypeScript** no frontend (buildada com Vi
 
 ### Notificacoes (agenda interna)
 
-- Agenda interna substitui o Google Calendar: sem OAuth externo.
+- Agenda interna com lembretes; sem integracao com calendarios externos.
 - Ao criar/editar/excluir itens de dieta/treino, o backend agenda uma notificacao (`notifications` service).
 - Notificacoes in-app listadas na campainha do header (`/notificacoes`) e marcadas como lidas (`/notificacoes/<id>/lida`).
 - Envio de e-mail agendado (quando a conta e premium) com idempotencia via flag `enviado_email`.
@@ -130,7 +130,7 @@ O projeto combina uma SPA em **React + TypeScript** no frontend (buildada com Vi
 - Flask-Cors, Flask-JWT-Extended (access + refresh com CSRF).
 - MySQL Connector com pool de conexoes (`app/database.py`).
 - Werkzeug para hash de senha.
-- Requests + OAuthlib para Google OAuth e Google Calendar.
+- Requests + OAuthlib para Google OAuth.
 - Groq em formato compativel com OpenAI Chat Completions para a NutriAI.
 - Gunicorn para deploy.
 - Blueprints separados por dominio:

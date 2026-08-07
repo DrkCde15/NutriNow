@@ -1,19 +1,10 @@
-import { Link } from 'react-router-dom';
+import Navbar from '../../components/Navbar';
 import Icon from '../../components/Icon';
 
 export default function Lgpd() {
   return (
     <main className="page-main">
-      <nav className="navbar">
-        <Link to="/" className="brand">
-          <span className="brand-logo"><img src="/logo.png" alt="NutriNow" width="32" height="32" /></span>
-          <span>Nutri<span className="text-primary">Now</span></span>
-        </Link>
-        <div className="nav-links">
-          <Link to="/login" className="nav-link">Login</Link>
-          <Link to="/cadastro" className="btn btn-primary" style={{ padding: '.4rem 1rem', fontSize: '.85rem' }}>Criar conta</Link>
-        </div>
-      </nav>
+      <Navbar />
       <div className="container legal-page">
         <h1>LGPD – Lei Geral de Proteção de Dados</h1>
         <p className="text-muted" style={{ marginBottom: '2rem' }}>Conformidade com a Lei nº 13.709/2018</p>

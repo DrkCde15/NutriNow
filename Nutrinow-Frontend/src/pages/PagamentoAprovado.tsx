@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiRequest } from '../api/client';
+import Navbar from '../components/Navbar';
 import Icon from '../components/Icon';
 
 export default function PagamentoAprovado() {
@@ -20,16 +21,7 @@ export default function PagamentoAprovado() {
 
   return (
     <main className="page-main">
-      <nav className="navbar">
-        <Link to="/" className="brand">
-          <span className="brand-logo"><img src="/logo.png" alt="NutriNow" width="32" height="32" /></span>
-          <span>Nutri<span className="text-primary">Now</span></span>
-        </Link>
-        <div className="nav-links">
-          {user && <Link to="/chat" className="nav-link">Chat</Link>}
-          {!user && <Link to="/login" className="nav-link">Login</Link>}
-        </div>
-      </nav>
+      <Navbar />
       <div className="container" style={{ padding: '4rem 1rem', textAlign: 'center', maxWidth: '36rem' }}>
         <Icon name="checkCircle" size={64} style={{ color: 'var(--primary)' }} />
         <h1 style={{ margin: '1.5rem 0 1rem' }}>Pagamento confirmado!</h1>

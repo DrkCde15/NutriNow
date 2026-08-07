@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiRequest } from '../api/client';
+import Navbar from '../components/Navbar';
 import Icon from '../components/Icon';
 
 interface Feedback {
@@ -55,18 +55,7 @@ export default function Feedbacks() {
 
   return (
     <main className="page-main">
-      <nav className="navbar">
-        <Link to="/" className="brand">
-          <span className="brand-logo"><img src="/logo.png" alt="NutriNow" width="32" height="32" /></span>
-          <span>Nutri<span className="text-primary">Now</span></span>
-        </Link>
-        <div className="nav-links">
-          {!user && <Link to="/login" className="nav-link">Login</Link>}
-          {!user && <Link to="/cadastro" className="btn btn-primary" style={{ padding: '.4rem 1rem', fontSize: '.85rem' }}>Criar conta</Link>}
-          {user && <Link to="/dashboard" className="nav-link">Dashboard</Link>}
-          {user && <Link to="/chat" className="nav-link">Chat</Link>}
-        </div>
-      </nav>
+      <Navbar />
 
       <div className="container" style={{ padding: '2rem 1.5rem', maxWidth: '66rem' }}>
         <h1>Feedbacks</h1>

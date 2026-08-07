@@ -21,6 +21,7 @@ export default function Navbar() {
             <NavLink to="/calendario" className="nav-link">Calendário</NavLink>
             <NavLink to="/dieta-treino" className="nav-link">Dieta-Treino</NavLink>
             <NavLink to="/chat" className="nav-link">Chat</NavLink>
+            <NavLink to="/academias" className="nav-link">Academias</NavLink>
             <NavLink to="/perfil" className="nav-link">Perfil</NavLink>
             {showPacientes && <NavLink to="/pacientes" className="nav-link">Pacientes</NavLink>}
             {showPacientes && <NavLink to="/convidar" className="nav-link">Convidar</NavLink>}

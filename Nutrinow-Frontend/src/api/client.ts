@@ -37,6 +37,23 @@ export interface DietaTreinoItem {
   duration_minutes?: number;
 }
 
+export interface CalendarioEvento {
+  id: number;
+  title: string;
+  description?: string;
+  categoria: string;
+  event_date: string;
+  time?: string;
+  duration_minutes?: number;
+  created_at: string;
+}
+
+export interface CalendarioEventosResponse {
+  success: boolean;
+  count: number;
+  eventos: CalendarioEvento[];
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -317,6 +334,44 @@ export async function getNotificacoes(): Promise<Notificacao[]> {
 
 export async function marcarNotificacaoLida(id: number): Promise<void> {
   await apiRequest(`/notificacoes/${id}/lida`, { method: 'POST' });
+}
+
+export async function getEventosCalendario(desde?: string, ate?: string): Promise<CalendarioEvento[]> {
+  const params = new URLSearchParams();
+  if (desde) params.set('desde', desde);
+  if (ate) params.set('ate', ate);
+  const qs = params.toString();
+  const data = await apiRequest<CalendarioEventosResponse>(`/calendario/eventos${qs ? `?${qs}` : ''}`);
+  return Array.isArray(data?.eventos) ? data.eventos : [];
+}
+
+export interface CalendarioEventoPayload {
+  title: string;
+  description?: string;
+  categoria?: string;
+  event_date: string;
+  time?: string;
+  duration_minutes?: number;
+}
+
+export async function criarEventoCalendario(payload: CalendarioEventoPayload): Promise<CalendarioEvento> {
+  const data = await apiRequest<{ success: boolean; evento: CalendarioEvento }>('/calendario/eventos', {
+    method: 'POST',
+    body: payload,
+  });
+  return data.evento;
+}
+
+export async function atualizarEventoCalendario(id: number, payload: CalendarioEventoPayload): Promise<CalendarioEvento> {
+  const data = await apiRequest<{ success: boolean; evento: CalendarioEvento }>(`/calendario/eventos/${id}`, {
+    method: 'PUT',
+    body: payload,
+  });
+  return data.evento;
+}
+
+export async function excluirEventoCalendario(id: number): Promise<void> {
+  await apiRequest(`/calendario/eventos/${id}`, { method: 'DELETE' });
 }
 
 export interface ConviteInfo {

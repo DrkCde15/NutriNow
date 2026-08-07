@@ -25,17 +25,12 @@ const FEATURES = [
   {
     icon: 'calendar',
     title: 'Calendário',
-    text: 'Visualize dieta e treinos em um calendário mensal e sincronize com o Google Calendar.',
+    text: 'Visualize dieta e treinos em um calendário mensal com lembretes da sua rotina.',
   },
   {
     icon: 'activity',
     title: 'Dashboard',
     text: 'Acompanhe peso, altura, IMC e seu histórico recente de atividade em um só lugar.',
-  },
-  {
-    icon: 'refresh',
-    title: 'Google Calendar',
-    text: 'Crie, edite e exclua eventos automaticamente na sua agenda do Google.',
   },
 ];
 
@@ -175,7 +170,7 @@ export default function Landing() {
               </div>
               <div className="hero-checks">
                 <span><Icon name="check" size={16} /> Grátis para começar</span>
-                <span><Icon name="check" size={16} /> Premium com Google Calendar</span>
+                <span><Icon name="check" size={16} /> Premium com agenda interna</span>
               </div>
             </div>
 

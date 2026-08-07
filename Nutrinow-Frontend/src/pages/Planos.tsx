@@ -1,5 +1,5 @@
-import { Link } from 'react-router-dom';
 import { apiRequest } from '../api/client';
+import Navbar from '../components/Navbar';
 import Icon from '../components/Icon';
 
 const FREE_FEATURES = [
@@ -42,16 +42,7 @@ export default function Planos() {
 
   return (
     <main className="page-main">
-      <nav className="navbar">
-        <Link to="/" className="brand">
-          <span className="brand-logo"><img src="/logo.png" alt="NutriNow" width="32" height="32" /></span>
-          <span>Nutri<span className="text-primary">Now</span></span>
-        </Link>
-        <div className="nav-links">
-          <Link to="/login" className="nav-link">Login</Link>
-          <Link to="/cadastro" className="btn btn-primary" style={{ padding: '.4rem 1rem', fontSize: '.85rem' }}>Criar conta</Link>
-        </div>
-      </nav>
+      <Navbar />
 
       <section className="plans-hero">
         <span className="badge plans-hero-badge">

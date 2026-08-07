@@ -30,7 +30,6 @@ class ProductionChecksTest(unittest.TestCase):
             "GOOGLE_CLIENT_ID": "client-id",
             "GOOGLE_CLIENT_SECRET": "z" * 40,
             "GOOGLE_LOGIN_REDIRECT_URI": "https://api.example.com/auth/callback",
-            "GOOGLE_CALENDAR_REDIRECT_URI": "https://api.example.com/calendar/google/callback",
             "EMAIL_SENDER": "privacy@example.com",
             "EMAIL_PASSWORD": "mail-password-value-that-is-long-enough",
             "FRONTEND_URL_PROD": "https://app.example.com",

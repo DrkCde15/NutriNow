@@ -51,6 +51,25 @@ CREATE TABLE IF NOT EXISTS notificacoes (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 """
 
+CALENDARIO_EVENTOS_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS calendario_eventos (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT NULL,
+    categoria VARCHAR(30) NOT NULL DEFAULT 'evento',
+    event_date DATE NOT NULL,
+    time VARCHAR(50) NULL,
+    duration_minutes INT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_calendario_user_date (user_id, event_date),
+    INDEX idx_calendario_user_created (user_id, created_at),
+    CONSTRAINT fk_calendario_user
+        FOREIGN KEY (user_id) REFERENCES usuarios(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"""
+
 _table_columns_cache = {}
 _cache_lock = Lock()
 
@@ -212,3 +231,8 @@ def ensure_perfil_columns(cursor):
 def ensure_notificacoes_table(cursor):
     cursor.execute(NOTIFICACOES_TABLE_SQL)
     invalidate_table_columns("notificacoes")
+
+
+def ensure_calendario_eventos_table(cursor):
+    cursor.execute(CALENDARIO_EVENTOS_TABLE_SQL)
+    invalidate_table_columns("calendario_eventos")
