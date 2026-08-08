@@ -19,9 +19,23 @@ _ALL_TARGETS = set()
 _ALL_MUSCLE_GROUPS = set()
 
 
-def _dataset_path():
+def _dataset_base_dir():
+    configured = os.environ.get("EXERCISES_DATASET_DIR", "").strip()
+    if configured:
+        return os.path.abspath(configured)
     base = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-    return os.path.join(base, "exercises-dataset", "data", "exercises.json")
+    return os.path.join(base, "exercises-dataset")
+
+
+def get_dataset_dir():
+    return _dataset_base_dir()
+
+
+def _dataset_path():
+    return os.path.join(_dataset_base_dir(), "data", "exercises.json")
+
+def _media_dir():
+    return _dataset_base_dir()
 
 
 def _build_index(exercises):

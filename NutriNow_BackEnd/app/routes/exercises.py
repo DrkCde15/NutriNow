@@ -1,7 +1,7 @@
-import os
 import logging
 from flask import Blueprint, jsonify, request, send_from_directory
 from app.services.exercises_service import (
+    get_dataset_dir,
     ensure_loaded,
     get_all,
     get_by_id,
@@ -12,10 +12,15 @@ from app.services.exercises_service import (
 logger = logging.getLogger(__name__)
 exercises_bp = Blueprint("exercises", __name__, url_prefix="/exercises")
 
-_EXERCISES_DATASET_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "exercises-dataset")
-)
+_EXERCISES_DATASET_DIR = None
 _MEDIA_PREFIX = "/exercises/media/"
+
+
+def _media_base_dir():
+    global _EXERCISES_DATASET_DIR
+    if _EXERCISES_DATASET_DIR is None:
+        _EXERCISES_DATASET_DIR = get_dataset_dir()
+    return _EXERCISES_DATASET_DIR
 
 
 def _rewrite_media_urls(ex):
@@ -30,7 +35,7 @@ def _rewrite_media_urls(ex):
 
 @exercises_bp.route("/media/<path:filename>", methods=["GET"])
 def serve_media(filename):
-    return send_from_directory(_EXERCISES_DATASET_DIR, filename)
+    return send_from_directory(_media_base_dir(), filename)
 
 
 @exercises_bp.route("", methods=["GET"])
