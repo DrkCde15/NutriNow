@@ -3,8 +3,7 @@ import { useNavigate, Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { apiRequest } from '../../api/client';
 import Icon from '../../components/Icon';
-import NavLink from '../../components/NavLink';
-import NotificacaoBell from '../../components/NotificacaoBell';
+import Navbar from '../../components/Navbar';
 
 interface Patient {
   id: number;
@@ -17,7 +16,7 @@ interface Patient {
 }
 
 export default function Pacientes() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,21 +40,7 @@ export default function Pacientes() {
 
   return (
     <main className="page-main">
-      <nav className="navbar">
-        <Link to="/" className="brand">
-          <span className="brand-logo"><img src="/logo.png" alt="NutriNow" width="32" height="32" /></span>
-          <span>Nutri<span className="text-primary">Now</span></span>
-        </Link>
-        <div className="nav-links">
-          <NavLink to="/chat" className="nav-link">Chat</NavLink>
-          <NavLink to="/calendario" className="nav-link">Calendário</NavLink>
-          <NavLink to="/convidar" className="nav-link">Convidar</NavLink>
-          <NavLink to="/dieta-treino" className="nav-link">Dieta-Treino</NavLink>
-          <NavLink to="/dashboard" className="nav-link">Dashboard</NavLink>
-          <NotificacaoBell />
-          <button className="btn btn-ghost" onClick={logout} style={{ fontSize: '0.85rem' }}><Icon name="logout" size={16} /> Sair</button>
-        </div>
-      </nav>
+      <Navbar />
       <div className="container" style={{ padding: '2rem 1.5rem', maxWidth: '66rem' }}>
         <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
           <Icon name="users" />

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   apiRequest,
@@ -13,7 +13,7 @@ import {
   type CalendarioEvento,
 } from '../api/client';
 import Icon from '../components/Icon';
-import NavLink from '../components/NavLink';
+import Navbar from '../components/Navbar';
 
 interface DietaTreinoItem {
   id: number;
@@ -73,7 +73,7 @@ const EMPTY_FORM: EventoForm = {
 };
 
 export default function Calendario() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [entries, setEntries] = useState<CalendarEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -220,24 +220,9 @@ export default function Calendario() {
   const selectedKey = selectedDate ? `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}` : '';
   const selectedEntries = entriesMap.get(selectedKey) || [];
 
-  const role = user?.role;
-  const showPacientes = role === 'nutritionist' || role === 'personal_trainer';
-
   return (
     <main className="page-main">
-      <nav className="navbar">
-        <Link to="/" className="brand">
-          <span className="brand-logo"><img src="/logo.png" alt="NutriNow" width="32" height="32" /></span>
-          <span>Nutri<span className="text-primary">Now</span></span>
-        </Link>
-        <div className="nav-links">
-          <NavLink to="/chat" className="nav-link">Chat</NavLink>
-          <NavLink to="/dieta-treino" className="nav-link">Dieta-Treino</NavLink>
-          <NavLink to="/dashboard" className="nav-link">Dashboard</NavLink>
-          {showPacientes && <NavLink to="/pacientes" className="nav-link">Pacientes</NavLink>}
-          <button className="btn btn-ghost" onClick={logout} style={{ fontSize: '0.85rem' }}><Icon name="logout" size={16} /> Sair</button>
-        </div>
-      </nav>
+      <Navbar />
       <div className="container" style={{ padding: '2rem 1.5rem', maxWidth: '66rem' }}>
         <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
           <Icon name="calendar" />

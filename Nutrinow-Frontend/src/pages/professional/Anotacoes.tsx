@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link, Navigate } from 'react-router-dom';
+import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { apiRequest } from '../../api/client';
 import Icon from '../../components/Icon';
-import NotificacaoBell from '../../components/NotificacaoBell';
+import Navbar from '../../components/Navbar';
 
 interface Note {
   id: number;
@@ -15,7 +15,7 @@ interface Note {
 
 export default function Anotacoes() {
   const { id } = useParams();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,21 +62,7 @@ export default function Anotacoes() {
 
   return (
     <main className="page-main">
-      <nav className="navbar">
-        <Link to="/" className="brand">
-          <span className="brand-logo"><img src="/logo.png" alt="NutriNow" width="32" height="32" /></span>
-          <span>Nutri<span className="text-primary">Now</span></span>
-        </Link>
-        <div className="nav-links">
-          <Link to={`/pacientes/${id}`} className="nav-link"><Icon name="arrowLeft" size={16} /> Voltar</Link>
-          <Link to="/pacientes" className="nav-link">Pacientes</Link>
-          <Link to="/chat" className="nav-link">Chat</Link>
-          <Link to="/calendario" className="nav-link">Calendário</Link>
-          <Link to="/convidar" className="nav-link">Convidar</Link>
-          <NotificacaoBell />
-          <button className="btn btn-ghost" onClick={logout} style={{ fontSize: '0.85rem' }}><Icon name="logout" size={16} /> Sair</button>
-        </div>
-      </nav>
+      <Navbar />
       <div className="container" style={{ padding: '2rem 1.5rem', maxWidth: '66rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
           <div>

@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { apiRequest, criarConvite } from '../../api/client';
 import Icon from '../../components/Icon';
-import NavLink from '../../components/NavLink';
+import Navbar from '../../components/Navbar';
 
 export default function Convidar() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -45,22 +45,7 @@ export default function Convidar() {
 
   return (
     <main className="page-main">
-      <nav className="navbar">
-        <Link to="/" className="brand">
-          <span className="brand-logo"><img src="/logo.png" alt="NutriNow" width="32" height="32" /></span>
-          <span>Nutri<span className="text-primary">Now</span></span>
-        </Link>
-        <div className="nav-links">
-          <NavLink to="/chat" className="nav-link">Chat</NavLink>
-          <NavLink to="/calendario" className="nav-link">Calendário</NavLink>
-          <NavLink to="/dieta-treino" className="nav-link">Dieta-Treino</NavLink>
-          <NavLink to="/dashboard" className="nav-link">Dashboard</NavLink>
-          {user && (user.role === 'nutritionist' || user.role === 'personal_trainer') && (
-            <NavLink to="/pacientes" className="nav-link">Pacientes</NavLink>
-          )}
-          <button className="btn btn-ghost" onClick={logout} style={{ fontSize: '0.85rem' }}><Icon name="logout" size={16} /> Sair</button>
-        </div>
-      </nav>
+      <Navbar />
       <div className="container" style={{ padding: '2rem 1.5rem', maxWidth: '50rem' }}>
         <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
           <Icon name="bell" /> Convidar pacientes

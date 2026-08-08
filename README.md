@@ -6,7 +6,7 @@ NutriNow e uma plataforma web para acompanhamento de nutricao, treinos e rotina 
 
 ## Visao geral
 
-O projeto combina uma SPA em **React + TypeScript** no frontend (buildada com Vite) com uma API Flask no backend. A aplicacao permite criar conta, manter perfil fisico, registrar dietas e treinos, acompanhar progresso no dashboard, conversar com a NutriAI, receber lembretes por notificacoes internas (in-app e e-mail) e, para profissionais (nutricionistas/personal trainers), convidar pacientes e gerenciar pacientes.
+O projeto combina uma SPA em **React + TypeScript** no frontend (buildada com Vite) com uma API Flask no backend. A aplicacao permite criar conta, manter perfil fisico, registrar dietas e treinos, acompanhar progresso no dashboard, conversar com a NutriAI, consultar um catalogo de exercicios com midia (GIF/JPG), encontrar academias proximas, receber lembretes por notificacoes internas (in-app e e-mail) e, para profissionais (nutricionistas/personal trainers), convidar pacientes e gerenciar pacientes.
 
 > **Nota:** o backend Flask tambem e capaz de servir o frontend estatico gerado em `Nutrinow-Frontend/dist/` em um unico Web Service (deploy no Render).
 
@@ -29,8 +29,8 @@ O projeto combina uma SPA em **React + TypeScript** no frontend (buildada com Vi
 
 - Contas novas entram como gratuitas por padrao.
 - Contas gratuitas podem acessar Login, Cadastro, Perfil, Chat NutriAI, Feedbacks, Termos de Uso, Privacidade e LGPD.
-- Funcionalidades gratuitas para todos: notificacoes (campainha in-app), convite de pacientes e area do profissional (pacientes e anotacoes).
-- Dashboard, dietas/treinos e notificacoes por e-mail exigem conta premium.
+- Funcionalidades gratuitas para todos: notificacoes (campainha in-app), convite de pacientes, area do profissional (pacientes e anotacoes), Academias e catalogo de exercicios.
+- Dashboard, dietas/treinos, calendario de eventos e notificacoes por e-mail exigem conta premium.
 - A pagina de Planos (`/planos`) apresenta comparativo Gratis vs Premium, FAQ e botao de checkout.
 - O botao Pagar chama `/billing/checkout`, que gera o link da Cakto com `refId=nutrinow_user_<id>`.
 - O webhook `/billing/webhook/cakto` ativa premium somente apos validar o pedido como pago na API da Cakto.
@@ -57,6 +57,7 @@ O projeto combina uma SPA em **React + TypeScript** no frontend (buildada com Vi
 - Recorrencia semanal com selecao de dias da semana e data final opcional.
 - Calendario mensal no frontend com expansao de eventos recorrentes.
 - Lembretes da rotina exibidos no calendario e na campainha de notificacoes.
+- Eventos personalizados do usuario (premium) em `calendario_eventos`, com categorias `evento`, `lembrete`, `dieta` e `treino`, via blueprints `calendario` (`GET/POST /calendario/eventos`, `PUT/DELETE /calendario/eventos/<id>`).
 
 ### Notificacoes (agenda interna)
 
@@ -81,6 +82,25 @@ O projeto combina uma SPA em **React + TypeScript** no frontend (buildada com Vi
 - Renderizacao de Markdown basico no frontend, incluindo listas, tabelas e enfases.
 - Sugestoes de mensagem (chips) exibidas acima da barra de texto quando a conversa esta vazia, enviando exemplos prontos para a NutriAI ao clicar.
 - Upload de imagem no chat com analise visual real quando `GROQ_VISION_MODEL` aponta para um modelo multimodal compativel (`/analyze_image`).
+
+### Academias
+
+- Pagina `/academias` (gratuita) para buscar academias proximas ao usuario.
+- Geolocalizacao do navegador ou entrada manual de coordenadas (latitude/longitude).
+- Raio de busca configuravel (5/10/20/50 km) com validacao de limites no backend.
+- Dados de academias obtidos da API Overpass (OpenStreetMap) via `GET /academias/nearby`.
+- Resposta com nome, endereco, telefone, website, horarios e distancia em km (ordenada por distancia).
+- Link para rota no Google Maps por academia.
+- Rate limit de 60 requisicoes/hora por usuario no endpoint e cache de resultados (`ACADEMIAS_CACHE_SECONDS`).
+
+### Catalogo de exercicios
+
+- Endpoint publico `GET /exercises` com listagem, filtros por grupo muscular, equipamento, categoria, alvo e busca textual (`q`).
+- Suporte a paginacao com `limit` e filtros em `GET /exercises/filters`.
+- Detalhe de exercicio em `GET /exercises/<id>` e lista completa em `GET /exercises/all`.
+- Midia dos exercicios servida estaticamente em `GET /exercises/media/<arquivo>` (GIF/JPG).
+- Dataset local em `NutriNow_BackEnd/exercises-dataset/` (nao versionado no git), carregado em memoria com indice por filtros no boot (`exercises_service.ensure_loaded`).
+- Sincronizacao do dataset via Google Drive ou URL de arquivo (`scripts/sync_exercises_dataset.py`, variaveis `EXERCISES_DATASET_*`) — tambem executada no boot do deploy (Render) por `render-build.sh`.
 
 ### Area do profissional
 
@@ -122,7 +142,7 @@ O projeto combina uma SPA em **React + TypeScript** no frontend (buildada com Vi
 - Upload de arquivos com `FormData` para o endpoint de analise de imagem.
 - Paginas de termos de uso, privacidade e LGPD com rotas publicas.
 - Analytics proprio com consentimento explicito e eventos minimizados.
-- Interface responsiva com paginas para landing, autenticacao, dashboard, planos, calendario, chat, perfil, feedbacks e area do profissional.
+- Interface responsiva com paginas para landing, autenticacao, dashboard, planos, calendario, chat, perfil, academias, feedbacks e area do profissional.
 
 ### Backend
 
@@ -144,6 +164,9 @@ O projeto combina uma SPA em **React + TypeScript** no frontend (buildada com Vi
   - `billing` (checkout Cakto + webhook)
   - `analytics` (eventos)
   - `professional` (pacientes, anotacoes, dietas/treinos de paciente)
+  - `calendario` (eventos personalizados premium)
+  - `gym` (academias proximas via Overpass)
+  - `exercises` (catalogo de exercicios + midia estática)
 - CORS configuravel por ambiente, com origens locais e de producao.
 - Cookies de refresh token com suporte a CSRF.
 - Headers de seguranca, incluindo `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`, CSP e HSTS em producao.
@@ -158,7 +181,7 @@ O projeto combina uma SPA em **React + TypeScript** no frontend (buildada com Vi
 - Schema principal em `NutriNow_BackEnd/app/services/db_schema.py`.
 - Script de inicializacao/atualizacao em `NutriNow_BackEnd/init_db.py`.
 - `NutriNow_BackEnd/SQL.txt` fica como referencia historica/manual.
-- Tabelas principais: `usuarios`, `perfil`, `redefinicao_senha`, `dieta_treino`, `notificacoes`, `chat_history`, `uploads`, `feedbacks`, `analytics_events`, `pacientes`, `paciente_anotacoes`, `paciente_dietas`, `paciente_treinos` e `convites_profissionais`.
+- Tabelas principais: `usuarios`, `perfil`, `redefinicao_senha`, `dieta_treino`, `notificacoes`, `chat_history`, `uploads`, `feedbacks`, `analytics_events`, `calendario_eventos`, `pacientes`, `paciente_anotacoes`, `paciente_dietas`, `paciente_treinos` e `convites_profissionais`.
 - Relacionamentos com chaves estrangeiras e exclusao em cascata onde faz sentido, como perfil, rotina e tokens vinculados ao usuario.
 - Indices para consultas frequentes por usuario, sessao, e-mail, data e tipo de item.
 - Pool de conexoes configuravel por `MYSQL_POOL_SIZE` (padrao `10`), com opcao de desativar via `MYSQL_DISABLE_POOL`.
@@ -171,6 +194,8 @@ O projeto combina uma SPA em **React + TypeScript** no frontend (buildada com Vi
 - Cakto para checkout premium e webhook de confirmacao de pagamento.
 - SMTP para recuperacao de senha, notificacao de feedbacks e envio de lembretes agendados.
 - Groq API para respostas da NutriAI.
+- Overpass API (OpenStreetMap) para busca de academias proximas.
+- Google Drive (arquivo publico) para sincronizacao do dataset de exercicios.
 - APScheduler para disparo agendado de notificacoes/e-mails.
 - `python-dotenv` para carregar variaveis de ambiente em desenvolvimento.
 
@@ -198,15 +223,22 @@ NutriNow-2/
 |  |- render-build.sh
 |  |- .env.example
 |  |- SQL.txt
+|  |- nutrinow2.sql
+|  |- migrations/          # scripts SQL de migracao pontual
+|  |- exercises-dataset/   # dataset de exercicios (nao versionado; sincronizado via Drive)
+|  |- scripts/
+|  |  |- sync_exercises_dataset.py  # download/atualizacao do dataset
+|  |- tests/               # testes de integracao e de validacao de producao
 |  |- app/
 |  |  |- __init__.py        # factory create_app()
 |  |  |- database.py        # pool de conexoes MySQL
 |  |  |- security.py        # helpers de ambiente/CORS
 |  |  |- routes/            # blueprints: auth, profile, fitness, chatbot,
 |  |  |                     #   notifications, invites, feedbacks, billing,
-|  |  |                     #   analytics, professional
+|  |  |                     #   analytics, professional, calendario, gym, exercises
 |  |  |- services/          # db_schema, mail_service, cakto_service,
-|  |                        #   agent_service, access_control, caches, validation, ...
+|  |                        #   agent_service, access_control, caches, validation,
+|  |                        #   exercises_service, gym_service, ...
 |- Nutrinow-Frontend/
 |  |- index.html
 |  |- package.json
@@ -218,9 +250,9 @@ NutriNow-2/
 |  |  |- api/client.ts      # cliente HTTP centralizado
 |  |  |- context/AuthContext.tsx
 |  |  |- hooks/
-|  |  |- components/
+|  |  |- components/        # Navbar, NavLink, Footer, Icon, NotificacaoBell, ...
 |  |  |- pages/             # auth/, professional/, legal/, e paginas principais
-|  |  |- styles/
+|  |  |- styles.css
 |  |- public/
 |  `- dist/                 # build de producao (gerado)
 `- README.md
@@ -248,7 +280,7 @@ cd NutriNow_BackEnd
 python init_db.py
 ```
 
-O script cria ou atualiza as tabelas principais: usuarios, perfil, redefinicao de senha, dieta/treino, notificacoes, historico de chat, uploads, feedbacks, analytics e as tabelas da area profissional (pacientes, anotacoes, dietas, treinos de paciente e convites). Tabelas e colunas novas tambem sao criadas dinamicamente em bancos ja existentes via `schema_cache`.
+O script cria ou atualiza as tabelas principais: usuarios, perfil, redefinicao de senha, dieta/treino, notificacoes, historico de chat, uploads, feedbacks, analytics, eventos de calendario e as tabelas da area profissional (pacientes, anotacoes, dietas, treinos de paciente e convites). Tabelas e colunas novas tambem sao criadas dinamicamente em bancos ja existentes via `schema_cache`.
 
 ## Variaveis de ambiente
 
@@ -314,6 +346,14 @@ UPLOAD_FOLDER=uploads
 CHAT_MESSAGE_MAX_CHARS=8000
 CHAT_SESSIONS_CACHE_SECONDS=12
 USER_ACCOUNT_CACHE_SECONDS=120
+
+ACADEMIAS_CACHE_SECONDS=600
+OVERPASS_URL=https://overpass-api.de/api/interpreter
+
+# Exercises dataset: caminho local (drive montado/sincronizado) ou download no boot.
+# EXERCISES_DATASET_DIR=/app/exercises-dataset
+# EXERCISES_DATASET_ARCHIVE_URL=https://.../exercises-dataset.tar.gz
+# EXERCISES_DATASET_COPY_DIR=/mnt/drive/exercises-dataset
 ```
 
 Em producao, use `APP_ENV=production`, configure `FRONTEND_URL_PROD`/`CORS_ORIGINS_PROD` com HTTPS, ative `JWT_COOKIE_SECURE=true`, configure `GROQ_VISION_MODEL` com um modelo multimodal para analise real de imagens e use segredos com pelo menos 32 caracteres. `groq/compound-mini` e `groq/compound` ficam recomendados para texto/fallback. A aplicacao falha no boot se a validacao de producao encontrar configuracao insegura ou incompleta.
@@ -361,7 +401,7 @@ Backend:
 
 ```powershell
 cd NutriNow_BackEnd
-python -m pytest            # suiter de testes (24+ verificacoes de integracao)
+python -m pytest            # suiter de testes (26+ verificacoes de integracao)
 python -m compileall .
 ```
 
@@ -376,5 +416,9 @@ Start Command: gunicorn --chdir NutriNow_BackEnd App:app
 ```
 
 O script `render-build.sh` instala as dependencias Python, instala/prepara o frontend e gera `Nutrinow_Frontend/dist/`. O Flask serve esse `dist/` automaticamente pela mesma URL do backend (fallback de SPA em `app/__init__.py`).
+
+No Render, defina alem das variaveis do `.env.example`:
+- `EXERCISES_DATASET_ARCHIVE_URL` (link publico do arquivo do dataset, ex.: Google Drive) — o `render-build.sh` baixa e extrai o dataset durante o build para `exercises-dataset/`. Sem essa variavel, o catalogo de exercicios fica indisponivel.
+- Opcional: `EXERCISES_DATASET_DIR` (caminho customizado) e `OVERPASS_URL` (padrao: `https://overpass-api.de/api/interpreter`).
 
 Nao configure **Publish Directory** nesse caso. Publish Directory e apenas para **Static Site** separado. Deixar o Root Directory vazio tambem faz mudancas no frontend dispararem deploy automatico.

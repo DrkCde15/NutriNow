@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { apiRequest } from '../../api/client';
 import Icon from '../../components/Icon';
-import NotificacaoBell from '../../components/NotificacaoBell';
+import Navbar from '../../components/Navbar';
 
 interface PatientDetail {
   id: number;
@@ -18,7 +18,7 @@ interface PatientDetail {
 
 export default function PacienteDetalhe() {
   const { id } = useParams();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [patient, setPatient] = useState<PatientDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -69,21 +69,7 @@ export default function PacienteDetalhe() {
 
   return (
     <main className="page-main">
-      <nav className="navbar">
-        <Link to="/" className="brand">
-          <span className="brand-logo"><img src="/logo.png" alt="NutriNow" width="32" height="32" /></span>
-          <span>Nutri<span className="text-primary">Now</span></span>
-        </Link>
-        <div className="nav-links">
-          <Link to="/pacientes" className="nav-link"><Icon name="arrowLeft" size={16} /> Pacientes</Link>
-          <Link to="/chat" className="nav-link">Chat</Link>
-          <Link to="/calendario" className="nav-link">Calendário</Link>
-          <Link to="/convidar" className="nav-link">Convidar</Link>
-          <Link to="/dashboard" className="nav-link">Dashboard</Link>
-          <NotificacaoBell />
-          <button className="btn btn-ghost" onClick={logout} style={{ fontSize: '0.85rem' }}><Icon name="logout" size={16} /> Sair</button>
-        </div>
-      </nav>
+      <Navbar />
       <div className="container" style={{ padding: '2rem 1.5rem', maxWidth: '66rem' }}>
         <div className="card" style={{ marginBottom: '1.5rem' }}>
           <h1 style={{ margin: '0 0 0.25rem' }}>{patient.nome}</h1>

@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiRequest, ApiError } from '../api/client';
 import { useForm, validators } from '../hooks/useForm';
 import Icon from '../components/Icon';
-import NavLink from '../components/NavLink';
+import Navbar from '../components/Navbar';
 
 const ROLE_LABELS: Record<string, string> = {
   user: 'Usuário comum',
@@ -131,20 +131,7 @@ export default function Perfil() {
 
   return (
     <main className="page-main">
-      <nav className="navbar" role="navigation" aria-label="Navegação principal">
-        <Link to="/" className="brand" aria-label="Ir para o início">
-          <span className="brand-logo"><img src="/logo.png" alt="" width="32" height="32" /></span>
-          <span>Nutri<span className="text-primary">Now</span></span>
-        </Link>
-        <div className="nav-links">
-          <NavLink to="/chat" className="nav-link">Chat</NavLink>
-          <NavLink to="/calendario" className="nav-link">Calendário</NavLink>
-          <NavLink to="/dieta-treino" className="nav-link">Dieta-Treino</NavLink>
-          <NavLink to="/dashboard" className="nav-link">Dashboard</NavLink>
-          {(user.role === 'nutritionist' || user.role === 'personal_trainer') && <NavLink to="/pacientes" className="nav-link">Pacientes</NavLink>}
-          <button className="btn btn-ghost" onClick={logout} style={{ fontSize: '0.85rem' }}><Icon name="logout" size={16} /> Sair</button>
-        </div>
-      </nav>
+      <Navbar />
 
       <div className="container" style={{ padding: '2rem 1.5rem', maxWidth: '66rem' }}>
         <section className="profile-hero">
