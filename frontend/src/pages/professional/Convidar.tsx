@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { apiRequest, criarConvite } from '../../api/client';
 import Icon from '../../components/Icon';
@@ -7,14 +7,13 @@ import Navbar from '../../components/Navbar';
 
 export default function Convidar() {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState('');
   const [copiado, setCopiado] = useState(false);
 
   if (user && user.role !== 'nutritionist' && user.role !== 'personal_trainer') {
-    return <>{navigate('/dashboard', { replace: true })}</>;
+    return <Navigate to="/dashboard" replace />;
   }
 
   const gerarLink = async () => {

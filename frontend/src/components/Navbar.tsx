@@ -93,6 +93,7 @@ export default function Navbar() {
         id="nav-drawer"
         className={`nav-drawer ${menuOpen ? 'open' : ''}`}
         aria-hidden={!menuOpen}
+        inert={!menuOpen}
       >
         <div className="nav-drawer-header">
           <Link to="/" className="brand" onClick={fechar}>

@@ -13,7 +13,7 @@ export default function ResetSenha() {
   const [loading, setLoading] = useState(false);
 
   const { values, errors, touched, handleChange, handleBlur, validateAll } = useForm({
-    novaSenha: { initial: '', rules: [validators.required('Informe a nova senha'), validators.minLength(10)] },
+    novaSenha: { initial: '', rules: [validators.required('Informe a nova senha'), validators.password()] },
     confirm: { initial: '', rules: [validators.required('Confirme a senha'), validators.match('novaSenha', 'As senhas não conferem')] },
   });
 
@@ -76,6 +76,7 @@ export default function ResetSenha() {
           {touched.novaSenha && errors.novaSenha && (
             <span id="reset-novaSenha-err" className="field-error" role="alert">{errors.novaSenha}</span>
           )}
+          <p className="field-hint">A senha precisa ter ao menos 10 caracteres, com letra maiúscula, minúscula e um número.</p>
         </div>
         <div className="field">
           <label htmlFor="reset-confirm">Confirmar nova senha</label>

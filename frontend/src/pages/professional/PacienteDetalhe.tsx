@@ -99,7 +99,7 @@ export default function PacienteDetalhe() {
             <h3 style={{ margin: 0 }}>Anotações do profissional</h3>
             <Link to={`/pacientes/${id}/anotacoes`} className="btn btn-secondary"><Icon name="bookOpen" /> Ver anotações completas</Link>
           </div>
-          {obsSaved && <div className="alert" style={{ marginBottom: '0.5rem', background: 'oklch(0.5 0.2 145 / 0.1)', color: 'oklch(0.4 0.18 145)', borderColor: 'oklch(0.5 0.2 145 / 0.3)' }}><Icon name="check" /> Salvo</div>}
+          {obsSaved && <div className="alert alert-success" style={{ marginBottom: '0.5rem' }}><Icon name="check" /> Salvo</div>}
           <textarea className="input textarea" rows={4} value={obs} onChange={e => setObs(e.target.value)} placeholder="Adicione observações sobre este paciente..." />
           <button className="btn btn-primary" style={{ marginTop: '0.75rem' }} onClick={saveObs} disabled={savingObs}>
             {savingObs ? 'Salvando...' : <><Icon name="save" /> Salvar observações</>}

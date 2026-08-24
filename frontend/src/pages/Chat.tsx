@@ -39,7 +39,7 @@ export default function Chat() {
 
   return (
     <div className="chat-app">
-      <aside className={`chat-sidebar ${sidebarOpen ? 'open' : ''}`}>
+      <aside className={`chat-sidebar ${sidebarOpen ? 'open' : ''}`} inert={!sidebarOpen}>
         <div className="chat-sidebar-header">
           <button
             className="btn btn-primary chat-new-btn"

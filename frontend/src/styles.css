@@ -119,6 +119,8 @@ img, svg { display: block; max-width: 100%; }
   transition: var(--transition-smooth);
 }
 .input:focus, .select:focus, textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px oklch(0.62 0.13 175 / 0.15); }
+.input-error { border-color: var(--destructive); background: oklch(0.6 0.22 27 / 0.04); }
+.input-error:focus { border-color: var(--destructive); box-shadow: 0 0 0 3px oklch(0.6 0.22 27 / 0.15); }
 .input-wrap { position: relative; display: flex; align-items: center; }
 .input-wrap .input { padding-right: 2.75rem; }
 .password-toggle {
@@ -540,8 +542,10 @@ input[type="range"] { width: 100%; margin: 0; }
 /* Role selector */
 .role-cards-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
 .role-card { cursor: pointer; }
-.role-card input { display: none; }
+.role-card input { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
 .role-card-inner { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; padding: 0.75rem; border-radius: 0.75rem; border: 2px solid var(--border); transition: var(--transition-smooth); text-align: center; }
+.role-card:hover .role-card-inner { border-color: color-mix(in oklab, var(--primary), var(--border) 60%); }
+.role-card input:focus-visible + .role-card-inner { outline: 2px solid var(--primary); outline-offset: 2px; }
 .role-card input:checked + .role-card-inner { border-color: var(--primary); background: oklch(0.62 0.13 175 / 0.08); }
 
 /* Dashboard cards */
@@ -791,6 +795,20 @@ input[type="range"] { width: 100%; margin: 0; }
 }
 .star-btn:hover { background: var(--surface); transform: scale(1.1); }
 .star-btn:focus-visible { outline: none; box-shadow: var(--ring); }
+
+/* Páginas legais */
+.legal-page { max-width: 56rem; }
+.legal-page section { margin-bottom: 2rem; }
+.legal-page h2 { margin: 0 0 0.5rem; font-size: 1.3rem; }
+.legal-page p { line-height: 1.7; }
+
+/* Grid de seleção de perfil em telas pequenas */
+@media (max-width: 520px) {
+  .role-cards-grid { grid-template-columns: 1fr; }
+}
+
+/* Chat ocupa a viewport dinâmica (evita corte em barras de endereço móveis) */
+.chat-app { height: 100dvh; }
 
 /* Utilitário de cor para estrelas (fallback caso --star não esteja definido) */
 :root { --star: var(--primary); }

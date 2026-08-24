@@ -252,7 +252,7 @@ export default function Calendario() {
                   const idx = d !== null ? `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}` : '';
                   const hasEntries = d !== null && (entriesMap.get(idx)?.length || 0) > 0;
                   const isToday = d !== null && d === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear();
-                  const isSelected = selectedDate && d === selectedDate.getDate();
+                  const isSelected = selectedDate && d === selectedDate.getDate() && viewMonth === selectedDate.getMonth() && viewYear === selectedDate.getFullYear();
                   return (
                     <button key={i} className={`calendar-day${isToday ? ' today' : ''}${isSelected ? ' selected' : ''}`} onClick={() => { if (d) setSelectedDate(new Date(viewYear, viewMonth, d)); }} disabled={!d} aria-label={d !== null ? `Dia ${d} de ${MONTHS[viewMonth]}` : undefined}>
                       {d !== null ? <span>{d}</span> : null}

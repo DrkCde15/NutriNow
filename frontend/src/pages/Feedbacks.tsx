@@ -63,26 +63,26 @@ export default function Feedbacks() {
 
         <section className="card" style={{ marginBottom: '2rem' }}>
           <h2 style={{ marginBottom: '1rem' }}>Deixe seu feedback</h2>
-          {sent && <div className="alert" style={{ marginBottom: '1rem', background: 'oklch(0.5 0.2 145 / 0.1)', color: 'oklch(0.4 0.18 145)', borderColor: 'oklch(0.5 0.2 145 / 0.3)' }}><Icon name="check" /> Feedback enviado com sucesso!</div>}
+          {sent && <div className="alert alert-success" style={{ marginBottom: '1rem' }}><Icon name="check" /> Feedback enviado com sucesso!</div>}
           {error && <div className="alert" style={{ marginBottom: '1rem' }}><Icon name="alert" /> {error}</div>}
           <form className="form" onSubmit={handleSubmit}>
             <div className="field">
-              <label>Nome</label>
-              <input className="input" value={nome} onChange={e => setNome(e.target.value)} required maxLength={100} />
+              <label htmlFor="fb-nome">Nome</label>
+              <input id="fb-nome" className="input" value={nome} onChange={e => setNome(e.target.value)} required maxLength={100} />
             </div>
             <div className="field">
-              <label>Nota</label>
-              <div className="stars-input">
+              <label htmlFor="fb-nota">Nota</label>
+              <div className="stars-input" id="fb-nota" role="radiogroup" aria-label="Nota de 1 a 5 estrelas">
                 {[1,2,3,4,5].map(n => (
-                  <button key={n} type="button" className="star-btn" onClick={() => setNota(n)} style={{ color: n <= nota ? 'var(--star)' : 'var(--border)' }}>
+                  <button key={n} type="button" className="star-btn" role="radio" aria-checked={n === nota} aria-label={`${n} estrela${n > 1 ? 's' : ''}`} onClick={() => setNota(n)} style={{ color: n <= nota ? 'var(--star)' : 'var(--border)' }}>
                     <Icon name="star" size={24} />
                   </button>
                 ))}
               </div>
             </div>
             <div className="field">
-              <label>Mensagem</label>
-              <textarea className="input textarea" value={texto} onChange={e => setTexto(e.target.value)} required rows={4} />
+              <label htmlFor="fb-texto">Mensagem</label>
+              <textarea id="fb-texto" className="input textarea" value={texto} onChange={e => setTexto(e.target.value)} required rows={4} />
             </div>
             <button className="btn btn-primary" type="submit" disabled={sending}>
               {sending ? 'Enviando...' : <><Icon name="send" /> Enviar feedback</>}
@@ -100,7 +100,7 @@ export default function Feedbacks() {
               <div key={f._id} className="card eq">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                   <span style={{ fontWeight: 700 }}>{f.nome}</span>
-                  <div style={{ display: 'flex', gap: '0.2rem' }}>
+                  <div style={{ display: 'flex', gap: '0.2rem' }} role="img" aria-label={`Nota ${f.nota} de 5`}>
                     {[1,2,3,4,5].map(n => <Icon key={n} name="star" size={16} style={{ color: n <= f.nota ? 'var(--star)' : 'var(--border)' }} />)}
                   </div>
                 </div>
