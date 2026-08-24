@@ -1,4 +1,5 @@
-import { apiRequest } from '../api/client';
+import { useState } from 'react';
+import { apiRequest, ApiError } from '../api/client';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import Icon from '../components/Icon';
@@ -32,12 +33,15 @@ const FAQ = [
 ];
 
 export default function Planos() {
+  const [checkoutError, setCheckoutError] = useState('');
+
   const handleCheckout = async () => {
+    setCheckoutError('');
     try {
       const res = await apiRequest<{ checkout_url: string }>('/billing/checkout', { method: 'POST' });
       window.location.href = res.checkout_url;
-    } catch (err: any) {
-      alert(err.message || 'Erro ao iniciar checkout');
+    } catch (err: unknown) {
+      setCheckoutError(err instanceof ApiError ? err.message : 'Erro ao iniciar o checkout. Tente novamente.');
     }
   };
 
@@ -83,6 +87,9 @@ export default function Planos() {
             <Icon name="lock" size={16} /> Assinar Premium por R$ 29,90
           </button>
           <p className="plan-note">Pagamento seguro · acesso liberado na hora</p>
+          {checkoutError && (
+            <div className="alert" style={{ marginTop: '0.75rem' }}><Icon name="alertCircle" /> {checkoutError}</div>
+          )}
         </div>
 
         <div className="plan-compare">

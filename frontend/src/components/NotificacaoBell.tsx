@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { getNotificacoes, marcarNotificacaoLida, type Notificacao } from '../api/client';
 import Icon from './Icon';
@@ -6,6 +6,7 @@ import Icon from './Icon';
 export default function NotificacaoBell() {
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
   const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const carregar = async () => {
@@ -18,7 +19,30 @@ export default function NotificacaoBell() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
   const naoLidas = notificacoes.filter(n => !n.lida).length;
+
+  const formatarData = (value?: string) => {
+    if (!value) return 'Data não disponível';
+    const data = new Date(value);
+    if (Number.isNaN(data.getTime())) return 'Data inválida';
+    return data.toLocaleString('pt-BR');
+  };
 
   const marcarLida = async (id: number) => {
     setNotificacoes(prev => prev.map(n => (n.id === id ? { ...n, lida: 1 } : n)));
@@ -28,11 +52,13 @@ export default function NotificacaoBell() {
   };
 
   return (
-    <div className="notif-bell" onMouseLeave={() => setOpen(false)}>
+    <div className="notif-bell" ref={containerRef} onMouseLeave={() => setOpen(false)}>
       <button
         className="btn btn-ghost notif-bell-btn"
         onClick={() => setOpen(o => !o)}
         aria-label="Notificações"
+        aria-haspopup="true"
+        aria-expanded={open}
         style={{ fontSize: '0.85rem', position: 'relative' }}
       >
         <Icon name="bell" size={16} />
@@ -52,7 +78,7 @@ export default function NotificacaoBell() {
                 <div className="notif-item-title">{n.titulo}</div>
                 <div className="notif-item-meta">
                   <span className="badge badge-outline">{n.tipo === 'dieta' ? 'Dieta' : 'Treino'}</span>
-                  <span>{new Date(n.agendado_para).toLocaleString('pt-BR')}</span>
+                  <span>{formatarData(n.agendado_para)}</span>
                 </div>
               </button>
             ))

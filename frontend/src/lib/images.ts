@@ -1,8 +1,7 @@
 import { getApiBase } from '../api/client';
 
-const API = getApiBase();
-
 export function pexelsImage(q: string, w = 800, h = 600, orientation = 'landscape'): string {
+  const API = getApiBase();
   return `${API}/pexels-image?q=${encodeURIComponent(q)}&w=${w}&h=${h}&orientation=${orientation}`;
 }
 

@@ -24,6 +24,7 @@ export default function Rotina() {
   const [dietas, setDietas] = useState<RoutineItem[]>([]);
   const [treinos, setTreinos] = useState<RoutineItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     if (!user) { navigate('/login', { replace: true }); return; }
@@ -32,6 +33,7 @@ export default function Rotina() {
 
   const loadAll = async () => {
     setLoading(true);
+    setError(false);
     try {
       const [d, t] = await Promise.all([
         apiRequest<{ success: boolean; items: RoutineItem[] }>('/dieta-treino?tipo=dieta'),
@@ -39,7 +41,9 @@ export default function Rotina() {
       ]);
       setDietas(d.items || []);
       setTreinos(t.items || []);
-    } catch { /* ok */ }
+    } catch {
+      setError(true);
+    }
     setLoading(false);
   };
 
@@ -60,6 +64,15 @@ export default function Rotina() {
 
         {loading ? (
           <div style={{ textAlign: 'center', padding: '2rem' }}><div className="spinner" /></div>
+        ) : error ? (
+          <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
+            <Icon name="alertCircle" size={48} style={{ color: 'var(--muted-foreground)' }} />
+            <h3 style={{ margin: '1rem 0 0.5rem' }}>Não foi possível carregar</h3>
+            <p className="text-muted">Ocorreu um erro ao buscar seus planos. Tente novamente.</p>
+            <button className="btn btn-secondary" style={{ marginTop: '1rem' }} onClick={loadAll}>
+              <Icon name="refresh" /> Tentar novamente
+            </button>
+          </div>
         ) : items.length === 0 ? (
           <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
             <Icon name={aba === 'dieta' ? 'leaf' : 'dumbbell'} size={48} style={{ color: 'var(--muted-foreground)' }} />

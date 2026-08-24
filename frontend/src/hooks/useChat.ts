@@ -25,7 +25,6 @@ export function useChat(options: ChatOptions = {}) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [showHistory, setShowHistory] = useState(false);
   const [conversationStarted, setConversationStarted] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [isAiTyping, setIsAiTyping] = useState(false);
@@ -203,8 +202,6 @@ export function useChat(options: ChatOptions = {}) {
     loading,
     error,
     sessions,
-    showHistory,
-    setShowHistory,
     conversationStarted,
     activeSessionId,
     isAiTyping,

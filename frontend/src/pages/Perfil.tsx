@@ -22,7 +22,7 @@ export default function Perfil() {
   const [avatarError, setAvatarError] = useState(false);
   const [convidadoFotoError, setConvidadoFotoError] = useState(false);
 
-  const { values, errors, touched, handleChange, handleBlur, validateAll } = useForm({
+  const { values, errors, touched, handleChange, handleBlur, validateAll, setValue } = useForm({
     nome: { initial: user?.nome || '', rules: [validators.required('Informe o nome')] },
     sobrenome: { initial: user?.sobrenome || '' },
     genero: { initial: user?.genero || 'Masculino' },
@@ -38,6 +38,23 @@ export default function Perfil() {
     if (!user) { navigate('/login', { replace: true }); return; }
     loadProfile();
   }, []);
+
+  // Sincroniza o formulário com os dados completos vindos de /perfil
+  // (o payload de login não traz genero, dataNascimento, meta, ja_treinou).
+  useEffect(() => {
+    if (!profileLoaded || !user) return;
+    const p = user as any;
+    setValue('nome', user.nome || '');
+    setValue('sobrenome', user.sobrenome || '');
+    setValue('genero', p.genero || 'Masculino');
+    setValue('dataNascimento', p.dataNascimento || '');
+    setValue('email', user.email || '');
+    setValue('meta', p.meta || 'Não definida');
+    setValue('jaTreinou', p.ja_treinou || 'Nunca treinou');
+    setValue('altura', String(user.altura ?? ''));
+    setValue('peso', String(user.peso ?? ''));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileLoaded]);
 
   const loadProfile = async () => {
     try {

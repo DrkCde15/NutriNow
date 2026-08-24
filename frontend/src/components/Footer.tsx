@@ -29,7 +29,7 @@ export default function Footer() {
           </div>
           <div>
             <h4>Suporte</h4>
-            <NavLink to="/privacidade" className="nav-link" style={{ display: 'block', paddingLeft: 0 }}>Privacidade</NavLink>
+            <NavLink to="/feedbacks" className="nav-link" style={{ display: 'block', paddingLeft: 0 }}>Envie um feedback</NavLink>
           </div>
         </div>
         <div style={{ borderTop: '1px solid var(--border)', marginTop: '2rem', paddingTop: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>

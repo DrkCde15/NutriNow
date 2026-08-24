@@ -139,6 +139,13 @@ export default function Calendario() {
     } catch { /* ok */ }
   };
 
+  const formatarData = (value?: string) => {
+    if (!value) return 'Data não disponível';
+    const data = new Date(value);
+    if (Number.isNaN(data.getTime())) return 'Data inválida';
+    return data.toLocaleString('pt-BR');
+  };
+
   const openCreateForm = () => {
     const date = selectedDate
       ? `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`
@@ -235,9 +242,9 @@ export default function Calendario() {
           <>
             <div className="calendar-wrap">
               <div className="calendar-nav">
-                <button className="btn btn-ghost" onClick={prevMonth}><Icon name="arrowLeft" /></button>
+                <button className="btn btn-ghost" onClick={prevMonth} aria-label="Mês anterior"><Icon name="arrowLeft" /></button>
                 <span style={{ fontWeight: 700, fontSize: '1.15rem' }}>{MONTHS[viewMonth]} {viewYear}</span>
-                <button className="btn btn-ghost" onClick={nextMonth}><Icon name="arrowRight" /></button>
+                <button className="btn btn-ghost" onClick={nextMonth} aria-label="Próximo mês"><Icon name="arrowRight" /></button>
               </div>
               <div className="calendar-grid">
                 {WEEKDAYS.map(d => <div key={d} className="calendar-weekday">{d}</div>)}
@@ -247,9 +254,9 @@ export default function Calendario() {
                   const isToday = d !== null && d === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear();
                   const isSelected = selectedDate && d === selectedDate.getDate();
                   return (
-                    <button key={i} className={`calendar-day${isToday ? ' today' : ''}${isSelected ? ' selected' : ''}`} onClick={() => { if (d) setSelectedDate(new Date(viewYear, viewMonth, d)); }} disabled={!d}>
+                    <button key={i} className={`calendar-day${isToday ? ' today' : ''}${isSelected ? ' selected' : ''}`} onClick={() => { if (d) setSelectedDate(new Date(viewYear, viewMonth, d)); }} disabled={!d} aria-label={d !== null ? `Dia ${d} de ${MONTHS[viewMonth]}` : undefined}>
                       {d !== null ? <span>{d}</span> : null}
-                      {hasEntries && <span className="calendar-dot" />}
+                      {hasEntries && <span className="calendar-dot" aria-hidden />}
                     </button>
                   );
                 })}
@@ -277,9 +284,9 @@ export default function Calendario() {
                       <p className="text-muted" style={{ marginTop: '0.25rem', fontSize: '0.85rem' }}>{n.mensagem}</p>
                       <div style={{ marginTop: '0.35rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                         <span className="badge badge-outline">{n.tipo === 'dieta' ? 'Dieta' : 'Treino'}</span>
-                        <span className="text-muted" style={{ fontSize: '0.75rem' }}>
-                          {new Date(n.agendado_para).toLocaleString('pt-BR')}
-                        </span>
+                         <span className="text-muted" style={{ fontSize: '0.75rem' }}>
+                           {formatarData(n.agendado_para)}
+                         </span>
                         {n.enviado_email ? (
                           <span className="badge badge-outline" style={{ fontSize: '0.7rem' }}>e-mail enviado</span>
                         ) : null}
@@ -322,10 +329,10 @@ export default function Calendario() {
                           </div>
                           {e.fonte === 'evento' && (
                             <div style={{ display: 'flex', gap: '0.5rem' }}>
-                              <button className="btn btn-ghost" style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem' }} onClick={() => openEditForm(e)}>
+                              <button className="btn btn-ghost" style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem' }} onClick={() => openEditForm(e)} aria-label={`Editar evento ${e.title}`}>
                                 <Icon name="edit" size={14} />
                               </button>
-                              <button className="btn btn-ghost" style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem' }} onClick={() => deleteEvent(e)}>
+                              <button className="btn btn-ghost" style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem' }} onClick={() => deleteEvent(e)} aria-label={`Excluir evento ${e.title}`}>
                                 <Icon name="trash" size={14} />
                               </button>
                             </div>

@@ -10,7 +10,7 @@ interface MessageListProps {
 
 function MessageItem({ message }: { message: ChatMessage }) {
   return (
-    <div className={`message ${message.role}`} role="log" aria-live="polite">
+    <div className={`message ${message.role}`}>
       {message.role === 'assistant' && (
         <div className="message-avatar" aria-hidden>
           <Icon name="sparkles" size={16} />
