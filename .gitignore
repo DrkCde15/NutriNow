@@ -9,4 +9,4 @@
 uploads/
 *node_modules/
 .venv/
-NutriNow_BackEnd/exercises-dataset/
+backend/exercises-dataset/

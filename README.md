@@ -2,13 +2,13 @@
 
 NutriNow e uma plataforma web para acompanhamento de nutricao, treinos e rotina saudavel com apoio da NutriAI.
 
-![Logo do projeto](Nutrinow-Frontend\public\logo.png)
+![Logo do projeto](frontend\public\logo.png)
 
 ## Visao geral
 
 O projeto combina uma SPA em **React + TypeScript** no frontend (buildada com Vite) com uma API Flask no backend. A aplicacao permite criar conta, manter perfil fisico, registrar dietas e treinos, acompanhar progresso no dashboard, conversar com a NutriAI, consultar um catalogo de exercicios com midia (GIF/JPG), encontrar academias proximas, receber lembretes por notificacoes internas (in-app e e-mail) e, para profissionais (nutricionistas/personal trainers), convidar pacientes e gerenciar pacientes.
 
-> **Nota:** o backend Flask tambem e capaz de servir o frontend estatico gerado em `Nutrinow-Frontend/dist/` em um unico Web Service (deploy no Render).
+> **Nota:** o backend Flask tambem e capaz de servir o frontend estatico gerado em `frontend/dist/` em um unico Web Service (deploy no Render).
 
 ## Funcionalidades
 
@@ -99,7 +99,7 @@ O projeto combina uma SPA em **React + TypeScript** no frontend (buildada com Vi
 - Suporte a paginacao com `limit` e filtros em `GET /exercises/filters`.
 - Detalhe de exercicio em `GET /exercises/<id>` e lista completa em `GET /exercises/all`.
 - Midia dos exercicios servida estaticamente em `GET /exercises/media/<arquivo>` (GIF/JPG).
-- Dataset local em `NutriNow_BackEnd/exercises-dataset/` (nao versionado no git), carregado em memoria com indice por filtros no boot (`exercises_service.ensure_loaded`).
+- Dataset local em `backend/exercises-dataset/` (nao versionado no git), carregado em memoria com indice por filtros no boot (`exercises_service.ensure_loaded`).
 - Sincronizacao do dataset via Google Drive ou URL de arquivo (`scripts/sync_exercises_dataset.py`, variaveis `EXERCISES_DATASET_*`) — tambem executada no boot do deploy (Render) por `render-build.sh`.
 
 ### Area do profissional
@@ -178,9 +178,9 @@ O projeto combina uma SPA em **React + TypeScript** no frontend (buildada com Vi
 ### Banco de dados
 
 - MySQL 8+.
-- Schema principal em `NutriNow_BackEnd/app/services/db_schema.py`.
-- Script de inicializacao/atualizacao em `NutriNow_BackEnd/init_db.py`.
-- `NutriNow_BackEnd/SQL.txt` fica como referencia historica/manual.
+- Schema principal em `backend/app/services/db_schema.py`.
+- Script de inicializacao/atualizacao em `backend/init_db.py`.
+- `backend/SQL.txt` fica como referencia historica/manual.
 - Tabelas principais: `usuarios`, `perfil`, `redefinicao_senha`, `dieta_treino`, `notificacoes`, `chat_history`, `uploads`, `feedbacks`, `analytics_events`, `calendario_eventos`, `pacientes`, `paciente_anotacoes`, `paciente_dietas`, `paciente_treinos` e `convites_profissionais`.
 - Relacionamentos com chaves estrangeiras e exclusao em cascata onde faz sentido, como perfil, rotina e tokens vinculados ao usuario.
 - Indices para consultas frequentes por usuario, sessao, e-mail, data e tipo de item.
@@ -215,7 +215,7 @@ O projeto combina uma SPA em **React + TypeScript** no frontend (buildada com Vi
 
 ```text
 NutriNow-2/
-|- NutriNow_BackEnd/
+|- backend/
 |  |- App.py
 |  |- init_db.py
 |  |- requirements.txt
@@ -239,7 +239,7 @@ NutriNow-2/
 |  |  |- services/          # db_schema, mail_service, cakto_service,
 |  |                        #   agent_service, access_control, caches, validation,
 |  |                        #   exercises_service, gym_service, ...
-|- Nutrinow-Frontend/
+|- frontend/
 |  |- index.html
 |  |- package.json
 |  |- vite.config.ts        # dev server na porta 5173 com proxy /api -> :8000
@@ -276,7 +276,7 @@ CREATE DATABASE nutrinow2 CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 Depois de configurar o `.env`, rode o inicializador de schema:
 
 ```powershell
-cd NutriNow_BackEnd
+cd backend
 python init_db.py
 ```
 
@@ -284,7 +284,7 @@ O script cria ou atualiza as tabelas principais: usuarios, perfil, redefinicao d
 
 ## Variaveis de ambiente
 
-Crie `NutriNow_BackEnd/.env` copiando de `NutriNow_BackEnd/.env.example`:
+Crie `backend/.env` copiando de `backend/.env.example`:
 
 ```env
 APP_ENV=development
@@ -365,7 +365,7 @@ Para pagamentos, configure na Cakto o webhook apontando para `https://seu-backen
 ### Backend
 
 ```powershell
-cd NutriNow_BackEnd
+cd backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
@@ -380,7 +380,7 @@ API local: `http://127.0.0.1:8000`
 Em desenvolvimento o Vite roda na porta `5173` e faz proxy de `/api/*` para o backend em `http://127.0.0.1:8000` (ver `vite.config.ts`).
 
 ```powershell
-cd Nutrinow-Frontend
+cd frontend
 npm install
 npm run dev        # servidor de desenvolvimento (Vite) em http://localhost:5173
 npm run build      # gera dist/ (tsc -b && vite build)
@@ -392,7 +392,7 @@ npm run preview    # serve o build de producao localmente
 Frontend:
 
 ```powershell
-cd Nutrinow-Frontend
+cd frontend
 npm run lint       # type-check com tsc --noEmit
 npm run build      # build de producao
 ```
@@ -400,7 +400,7 @@ npm run build      # build de producao
 Backend:
 
 ```powershell
-cd NutriNow_BackEnd
+cd backend
 python -m pytest            # suiter de testes (26+ verificacoes de integracao)
 python -m compileall .
 ```
@@ -411,8 +411,8 @@ Para o backend tambem servir o frontend estatico, crie um servico do tipo **Web 
 
 ```text
 Root Directory: deixe vazio
-Build Command: bash NutriNow_BackEnd/render-build.sh
-Start Command: gunicorn --chdir NutriNow_BackEnd App:app
+Build Command: bash backend/render-build.sh
+Start Command: gunicorn --chdir backend App:app
 ```
 
 O script `render-build.sh` instala as dependencias Python, instala/prepara o frontend e gera `Nutrinow_Frontend/dist/`. O Flask serve esse `dist/` automaticamente pela mesma URL do backend (fallback de SPA em `app/__init__.py`).
