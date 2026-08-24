@@ -45,7 +45,7 @@ body::after {
 }
 
 * { box-sizing: border-box; }
-html { color-scheme: only light; scroll-behavior: smooth; }
+html { scroll-behavior: smooth; }
 
 body {
   margin: 0; min-height: 100vh;
@@ -809,6 +809,94 @@ input[type="range"] { width: 100%; margin: 0; }
 
 /* Chat ocupa a viewport dinâmica (evita corte em barras de endereço móveis) */
 .chat-app { height: 100dvh; }
+
+/* ===========================================================================
+   Tema escuro (Dark Mode) — adaptação da identidade visual existente.
+   Apenas variáveis e poucos ajustes pontuais de componente; sem nova identidade.
+   =========================================================================== */
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+
+:root[data-theme="dark"] {
+  --background: oklch(0.16 0.02 180);
+  --foreground: oklch(0.96 0.01 175);
+  --surface: oklch(0.21 0.025 180);
+  --card: oklch(0.23 0.025 180);
+  --primary: oklch(0.62 0.13 175);
+  --primary-dark: oklch(0.5 0.13 175);
+  --primary-foreground: oklch(0.99 0.01 170);
+  --primary-glow: oklch(0.78 0.16 165);
+  --secondary: oklch(0.28 0.04 175);
+  --secondary-foreground: oklch(0.88 0.03 180);
+  --muted: oklch(0.26 0.02 180);
+  --muted-foreground: oklch(0.72 0.02 180);
+  --accent: oklch(0.35 0.1 165);
+  --accent-foreground: oklch(0.95 0.02 175);
+  --destructive: oklch(0.68 0.22 27);
+  --border: oklch(0.32 0.02 180);
+  --input: oklch(0.32 0.02 180);
+  --gradient-soft: linear-gradient(180deg, oklch(0.22 0.03 180) 0%, oklch(0.16 0.02 180) 100%);
+  --gradient-radial: radial-gradient(circle at 30% 20%, oklch(0.45 0.14 160 / 0.22), transparent 60%);
+  --shadow-sm: 0 2px 6px -2px oklch(0 0 0 / 0.4);
+  --shadow-md: 0 10px 25px -10px oklch(0 0 0 / 0.5);
+  --shadow-lg: 0 25px 60px -20px oklch(0 0 0 / 0.55);
+  --shadow-glow: 0 0 40px oklch(0.78 0.16 165 / 0.25);
+  --ring: 0 0 0 3px oklch(0.62 0.13 175 / 0.45);
+}
+
+/* Ajustes pontuais de componentes para o tema escuro */
+:root[data-theme="dark"] body {
+  background:
+    radial-gradient(55% 45% at 12% 0%, oklch(0.4 0.14 160 / 0.18), transparent 70%),
+    radial-gradient(45% 45% at 100% 8%, oklch(0.4 0.16 165 / 0.15), transparent 70%),
+    var(--background);
+}
+:root[data-theme="dark"] .navbar { background: rgba(20, 28, 26, 0.82); }
+:root[data-theme="dark"] .lp-hero-bg {
+  background:
+    radial-gradient(42% 48% at 12% 8%, oklch(0.4 0.14 160 / 0.3), transparent 70%),
+    radial-gradient(38% 44% at 92% 16%, oklch(0.4 0.16 165 / 0.25), transparent 70%),
+    radial-gradient(55% 50% at 50% 105%, oklch(0.4 0.1 175 / 0.25), transparent 70%);
+}
+:root[data-theme="dark"] .alert { background: oklch(0.6 0.22 27 / 0.15); color: oklch(0.82 0.18 27); }
+:root[data-theme="dark"] .btn-white { color: oklch(0.2 0.03 180); }
+:root[data-theme="dark"] .avatar-button { color: oklch(0.2 0.03 180); }
+:root[data-theme="dark"] .alert-success,
+:root[data-theme="dark"] .status-pill.status-positive { background: oklch(0.5 0.2 145 / 0.18); color: oklch(0.82 0.18 145); }
+:root[data-theme="dark"] .input::placeholder,
+:root[data-theme="dark"] .select::placeholder,
+:root[data-theme="dark"] textarea::placeholder { color: var(--muted-foreground); opacity: 0.7; }
+
+/* Transição sutil ao trocar de tema (apenas superfícies estáticas) */
+.navbar, .card, .auth-panel, .auth-visual, .footer, .modal, .modal-overlay,
+.notif-dropdown, .chat-main-area, .message-content,
+.calendar-header-cell, .dash-table th, .dash-table td, .cta-card, .profile-hero,
+.bmi-card, .plan-card, .plan-compare-grid, .plan-faq-item, .plan-compare-row,
+.history-item, .patient-card, .convite-banner, .convite-link-box, .status-pill,
+.alert, .badge, .tabs {
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
+}
+
+/* Botão flutuante de alternância de tema (fixo, canto inferior esquerdo) */
+.theme-toggle {
+  position: fixed;
+  left: calc(1rem + env(safe-area-inset-left, 0px));
+  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  z-index: 450;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 3rem; height: 3rem; border-radius: 50%;
+  background: var(--card); color: var(--foreground);
+  border: 1px solid var(--border); box-shadow: var(--shadow-md);
+  cursor: pointer; transition: var(--transition-smooth);
+}
+.theme-toggle:hover { transform: translateY(-2px); border-color: var(--primary); color: var(--primary); }
+.theme-toggle:active { transform: scale(0.95); }
+.theme-toggle:focus-visible { outline: none; box-shadow: var(--ring); }
+
+/* Evita que o FAB cubra o botão de imagem do chat no mobile */
+@media (max-width: 768px) {
+  .chat-input-bar { padding-left: 4.5rem; }
+}
 
 /* Utilitário de cor para estrelas (fallback caso --star não esteja definido) */
 :root { --star: var(--primary); }
