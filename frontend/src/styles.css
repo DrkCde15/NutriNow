@@ -989,7 +989,37 @@ input[type="range"] { width: 100%; margin: 0; }
 
 /* Evita que o FAB cubra o botão de imagem do chat no mobile */
 @media (max-width: 768px) {
-  .chat-input-bar { padding-left: 4.5rem; }
+  .chat-input-bar {
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    padding-left: 4.5rem;
+    padding-bottom: calc(0.6rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* O textarea é o único elemento que cresce; botões têm tamanho fixo */
+  .chat-input-bar .input,
+  .chat-input-bar .chat-input {
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    resize: none;
+    min-height: 2.4rem;
+    max-height: 8rem;
+  }
+
+  /* Botões (enviar e anexar) NÃO devem esticar com o textarea */
+  .chat-input-bar > .btn {
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border-radius: 50%;
+    justify-content: center;
+    align-items: center;
+  }
 }
 
 /* Utilitário de cor para estrelas (fallback caso --star não esteja definido) */
