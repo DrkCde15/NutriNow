@@ -27,10 +27,19 @@ export default function Chat() {
 
   const [query, setQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     if (!user) { navigate('/login', { replace: true }); return; }
     loadSessions();
+  }, []);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)');
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
   }, []);
 
   const filtered = sessions.filter(s =>
@@ -39,7 +48,7 @@ export default function Chat() {
 
   return (
     <div className="chat-app">
-      <aside className={`chat-sidebar ${sidebarOpen ? 'open' : ''}`} inert={!sidebarOpen}>
+      <aside className={`chat-sidebar ${sidebarOpen ? 'open' : ''}`} inert={isMobile && !sidebarOpen}>
         <div className="chat-sidebar-header">
           <button
             className="btn btn-primary chat-new-btn"

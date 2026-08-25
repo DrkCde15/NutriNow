@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import type { ChatMessage } from '../api/client';
 import Icon from './Icon';
+import Markdown from './Markdown';
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -26,7 +27,11 @@ function MessageItem({ message }: { message: ChatMessage }) {
             onError={(e) => { e.currentTarget.style.display = 'none'; }}
           />
         )}
-        {message.content}
+        {message.role === 'assistant' ? (
+          <Markdown content={message.content} />
+        ) : (
+          message.content
+        )}
       </div>
     </div>
   );

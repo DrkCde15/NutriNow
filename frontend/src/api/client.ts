@@ -301,7 +301,10 @@ export async function apiRequest<T = unknown>(path: string, options: RequestOpti
       }
     }
 
-    if (res.status === 401) clearLocalSession();
+    if (res.status === 401) {
+      clearLocalSession();
+      if (typeof window !== 'undefined') window.dispatchEvent(new Event('nutrinow:unauthorized'));
+    }
 
     const message = extractErrorMessage(data) || `Erro ${res.status}`;
     throw new ApiError(message, res.status, data);

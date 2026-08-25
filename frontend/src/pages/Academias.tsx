@@ -35,8 +35,6 @@ export default function Academias() {
   const [error, setError] = useState('');
   const [academias, setAcademias] = useState<Academia[]>([]);
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [manualLat, setManualLat] = useState('');
-  const [manualLng, setManualLng] = useState('');
 
   const fetchNearby = async (lat: number, lng: number) => {
     setLoading(true);
@@ -56,7 +54,7 @@ export default function Academias() {
 
   const useLocation = () => {
     if (!navigator.geolocation) {
-      setError('Seu navegador não suporta geolocalização. Informe as coordenadas manualmente.');
+      setError('Seu navegador não suporta geolocalização.');
       return;
     }
     setLocating(true);
@@ -69,23 +67,13 @@ export default function Academias() {
       (err) => {
         setLocating(false);
         if (err.code === err.PERMISSION_DENIED) {
-          setError('Permissão de localização negada. Você pode informar as coordenadas manualmente.');
+          setError('Permissão de localização negada. Tente novamente ou use outra região.');
         } else {
-          setError('Não foi possível obter sua localização. Tente novamente ou informe as coordenadas manualmente.');
+          setError('Não foi possível obter sua localização. Tente novamente.');
         }
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
     );
-  };
-
-  const searchBy = async () => {
-    const lat = parseFloat(manualLat.replace(',', '.'));
-    const lng = parseFloat(manualLng.replace(',', '.'));
-    if (Number.isNaN(lat) || Number.isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-      setError('Informe coordenadas válidas (latitude entre -90 e 90, longitude entre -180 e 180).');
-      return;
-    }
-    await fetchNearby(lat, lng);
   };
 
   const mapsLink = (academia: Academia) =>
@@ -117,37 +105,6 @@ export default function Academias() {
           </div>
         </div>
 
-        <div className="card" style={{ marginBottom: '1.5rem' }}>
-          <h3 style={{ marginBottom: '0.75rem' }}>Ou busque por coordenadas</h3>
-          <div className="grid-2">
-            <div className="field">
-              <label htmlFor="manualLat">Latitude</label>
-              <input
-                id="manualLat"
-                className="input"
-                inputMode="decimal"
-                placeholder="-23.5505"
-                value={manualLat}
-                onChange={(e) => setManualLat(e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="manualLng">Longitude</label>
-              <input
-                id="manualLng"
-                className="input"
-                inputMode="decimal"
-                placeholder="-46.6333"
-                value={manualLng}
-                onChange={(e) => setManualLng(e.target.value)}
-              />
-            </div>
-          </div>
-          <button className="btn btn-secondary" style={{ marginTop: '1rem' }} onClick={searchBy} disabled={loading}>
-            <Icon name="search" /> Buscar na região
-          </button>
-        </div>
-
         {error && <div className="alert" style={{ marginBottom: '1.5rem' }}><Icon name="alertCircle" /> {error}</div>}
 
         {loading && <div style={{ textAlign: 'center', padding: '2rem' }}><div className="spinner" /></div>}
@@ -164,7 +121,7 @@ export default function Academias() {
           <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
             <Icon name="mapPin" size={48} style={{ color: 'var(--muted-foreground)' }} />
             <h3 style={{ margin: '1rem 0 0.5rem' }}>Encontre academias perto de você</h3>
-            <p className="text-muted">Permita o acesso à localização ou informe as coordenadas da sua região para listar academias próximas.</p>
+            <p className="text-muted">Permita o acesso à localização para listar academias próximas.</p>
           </div>
         )}
 

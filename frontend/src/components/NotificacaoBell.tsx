@@ -1,23 +1,31 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { getNotificacoes, marcarNotificacaoLida, type Notificacao } from '../api/client';
+import { getNotificacoes, marcarNotificacaoLida, ApiError, type Notificacao } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 import Icon from './Icon';
 
 export default function NotificacaoBell() {
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuth();
 
   useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    let interval: ReturnType<typeof setInterval> | undefined;
     const carregar = async () => {
       try {
-        setNotificacoes(await getNotificacoes());
-      } catch { /* ok */ }
+        const lista = await getNotificacoes();
+        if (!cancelled) setNotificacoes(lista);
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401 && interval) clearInterval(interval);
+      }
     };
     carregar();
-    const interval = setInterval(carregar, 60000);
-    return () => clearInterval(interval);
-  }, []);
+    interval = setInterval(carregar, 60000);
+    return () => { cancelled = true; if (interval) clearInterval(interval); };
+  }, [user]);
 
   useEffect(() => {
     if (!open) return;

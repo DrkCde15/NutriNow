@@ -45,6 +45,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SET_USER', user: stored });
   }, []);
 
+  useEffect(() => {
+    const onUnauthorized = () => dispatch({ type: 'LOGOUT' });
+    window.addEventListener('nutrinow:unauthorized', onUnauthorized);
+    return () => window.removeEventListener('nutrinow:unauthorized', onUnauthorized);
+  }, []);
+
   const login = useCallback((token: string, userData: User) => {
     storageSetToken(token);
     storageSetUser(userData);

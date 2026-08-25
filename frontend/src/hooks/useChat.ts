@@ -30,7 +30,7 @@ export function useChat(options: ChatOptions = {}) {
   const [isAiTyping, setIsAiTyping] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-scroll
   useEffect(() => {

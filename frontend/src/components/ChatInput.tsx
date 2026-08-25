@@ -1,4 +1,4 @@
-import { memo, useRef } from 'react';
+import { memo, useRef, useEffect } from 'react';
 import Icon from './Icon';
 
 interface ChatInputProps {
@@ -8,11 +8,18 @@ interface ChatInputProps {
   onImage: (file: File) => void;
   onKeyDown: (e: React.KeyboardEvent) => void;
   disabled: boolean;
-  inputRef: React.RefObject<HTMLInputElement | null>;
+  inputRef: React.RefObject<HTMLTextAreaElement | null>;
 }
 
 function ChatInput({ value, onChange, onSend, onImage, onKeyDown, disabled, inputRef }: ChatInputProps) {
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const ta = inputRef.current;
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`;
+  }, [value, inputRef]);
 
   return (
     <div className="chat-input-bar">
@@ -37,11 +44,11 @@ function ChatInput({ value, onChange, onSend, onImage, onKeyDown, disabled, inpu
           e.target.value = '';
         }}
       />
-      <input
+      <textarea
         ref={inputRef}
         className="input chat-input"
-        type="text"
-        placeholder="Digite sua mensagem..."
+        rows={1}
+        placeholder="Digite sua mensagem... (Enter envia, Shift+Enter pula linha)"
         value={value}
         onChange={e => onChange(e.target.value)}
         onKeyDown={onKeyDown}
