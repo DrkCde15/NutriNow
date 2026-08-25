@@ -46,6 +46,8 @@ body::after {
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; overflow-x: clip; }
+body { overflow-x: clip; max-width: 100%; }
+img, video, canvas, svg, table { max-width: 100%; height: auto; }
 
 body {
   margin: 0; min-height: 100vh;
@@ -208,7 +210,7 @@ img, svg { display: block; max-width: 100%; }
   .navbar-menu-btn { display: inline-flex; }
   .nav-links { display: none; }
   .nav-drawer {
-    display: flex;
+    display: none;
     position: fixed; top: 0; right: 0; bottom: 0; z-index: 400;
     width: min(19rem, 85vw);
     flex-direction: column;
@@ -217,7 +219,7 @@ img, svg { display: block; max-width: 100%; }
     transform: translateX(100%); transition: transform var(--transition-smooth);
     pointer-events: none;
   }
-  .nav-drawer.open { transform: translateX(0); pointer-events: auto; }
+  .nav-drawer.open { display: flex; transform: translateX(0); pointer-events: auto; }
   .nav-drawer-header {
     display: flex; align-items: center; justify-content: space-between;
     padding: 0.75rem 1rem; border-bottom: 1px solid var(--border);
@@ -433,7 +435,7 @@ input[type="range"] { width: 100%; margin: 0; }
 .calendar-event.dieta { background: oklch(0.5 0.2 145 / 0.1); color: oklch(0.35 0.18 145); }
 
 /* Chat - estilo ChatGPT */
-.chat-app { display: flex; height: 100vh; overflow: hidden; background: var(--card); }
+.chat-app { position: relative; display: flex; height: 100vh; overflow: hidden; background: var(--card); }
 .chat-sidebar {
   width: 280px; flex-shrink: 0; display: flex; flex-direction: column;
   background: var(--surface); border-right: 1px solid var(--border);
@@ -560,7 +562,7 @@ input[type="range"] { width: 100%; margin: 0; }
 @media (max-width: 768px) {
   .chat-menu-btn { display: inline-flex; }
   .chat-sidebar {
-    position: fixed; top: 0; left: 0; bottom: 0; z-index: 250;
+    position: absolute; top: 0; left: 0; bottom: 0; z-index: 250;
     width: min(280px, 85vw);
     transform: translateX(-100%); transition: transform var(--transition-smooth);
     box-shadow: 0.5rem 0 1.5rem rgba(0, 0, 0, 0.2);
