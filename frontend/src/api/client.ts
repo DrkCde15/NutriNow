@@ -2,6 +2,7 @@ const STORAGE = {
   token: 'nutrinow_access_token',
   user: 'nutrinow_user',
   apiBase: 'nutrinow_api_base',
+  refreshToken: 'nutrinow_refresh_token',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -157,6 +158,15 @@ function setToken(token: string) {
   else localStorage.removeItem(STORAGE.token);
 }
 
+function getRefreshToken(): string {
+  return localStorage.getItem(STORAGE.refreshToken) || '';
+}
+
+function setRefreshToken(refreshToken: string) {
+  if (refreshToken) localStorage.setItem(STORAGE.refreshToken, refreshToken);
+  else localStorage.removeItem(STORAGE.refreshToken);
+}
+
 function getUser(): User | null {
   try {
     const raw = localStorage.getItem(STORAGE.user);
@@ -176,9 +186,32 @@ function getRefreshCsrfToken(): string {
   return match ? decodeURIComponent(match[1]) : '';
 }
 
+// Decode the `exp` claim of a JWT without verifying the signature. Returns
+// the expiry as a unix timestamp (seconds) or null if it can't be read.
+function decodeJwtExp(token: string): number | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const json = JSON.parse(atob(b64));
+    return typeof json.exp === 'number' ? json.exp : null;
+  } catch {
+    return null;
+  }
+}
+
+// True when the token is missing an expiry we can read, already expired, or
+// expires within `marginSec`. Used to refresh proactively and skip a 401.
+function tokenExpiringSoon(token: string, marginSec = 60): boolean {
+  const exp = decodeJwtExp(token);
+  if (exp === null) return false;
+  return exp - Math.floor(Date.now() / 1000) <= marginSec;
+}
+
 export function clearLocalSession() {
   setToken('');
   setUser(null);
+  setRefreshToken('');
 }
 
 // ---------------------------------------------------------------------------
@@ -193,6 +226,8 @@ async function refreshSession(): Promise<unknown> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     const csrf = getRefreshCsrfToken();
     if (csrf) headers['X-CSRF-TOKEN'] = csrf;
+    const refreshToken = getRefreshToken();
+    if (refreshToken) headers['Authorization'] = `Bearer ${refreshToken}`;
     const res = await fetchWithTimeout(`${getApiBase()}/refresh`, {
       method: 'POST',
       headers,
@@ -201,6 +236,7 @@ async function refreshSession(): Promise<unknown> {
     if (!res.ok) throw new ApiError('Falha ao renovar sessão', res.status);
     const data = await res.json();
     setToken(data.access_token || data.token || '');
+    if (data.refresh_token) setRefreshToken(data.refresh_token);
     if (data.user) setUser(data.user);
     return data;
   })().finally(() => { refreshPromise = null; });
@@ -260,8 +296,24 @@ export async function apiRequest<T = unknown>(path: string, options: RequestOpti
   } = options;
 
   const headers: Record<string, string> = { ...extraHeaders };
-  const token = tokenOverride !== undefined ? (tokenOverride || '') : getToken();
+  let token = tokenOverride !== undefined ? (tokenOverride || '') : getToken();
   const isFormData = body instanceof FormData;
+
+  // Proactive refresh: renew the access token BEFORE sending the request so we
+  // never fire an unauthenticated call that 401s first. Triggers when we have
+  // no usable token (e.g. it was dropped from storage but the httpOnly refresh
+  // cookie survived a reload) OR when the current token is near/at expiry.
+  // Gated on the refresh CSRF cookie (same prerequisite as the on-401 fallback);
+  // refreshSession() deduplicates concurrent refreshes.
+  const tokenMissingOrExpiring = !token || tokenExpiringSoon(token);
+  if (tokenOverride === undefined && (getRefreshCsrfToken() || getRefreshToken()) && tokenMissingOrExpiring) {
+    try {
+      await refreshSession();
+      token = getToken();
+    } catch {
+      // Refresh failed; the request may still 401 and trigger the fallback.
+    }
+  }
 
   if (!isFormData && body !== undefined && !headers['Content-Type']) {
     headers['Content-Type'] = 'application/json';
@@ -288,7 +340,7 @@ export async function apiRequest<T = unknown>(path: string, options: RequestOpti
     const shouldRefresh =
       !skipAuthRefresh &&
       res.status === 401 &&
-      getRefreshCsrfToken() &&
+      (getRefreshCsrfToken() || getRefreshToken()) &&
       !['/refresh', '/login', '/cadastro', '/auth/exchange-code'].includes(path);
 
     if (shouldRefresh) {
@@ -407,4 +459,4 @@ export async function validarConvite(token: string): Promise<ConviteInfo | null>
   }
 }
 
-export { getApiBase, getToken, setToken, getUser, setUser };
+export { getApiBase, getToken, setToken, getRefreshToken, setRefreshToken, getUser, setUser };

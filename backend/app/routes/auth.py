@@ -216,11 +216,13 @@ def _account_by_id(user_id):
 def _auth_response(user, message="Login realizado com sucesso!"):
     account = _account_payload(user)
     access_token = create_access_token(identity=str(account["id"]), additional_claims={"role": account["role"]})
+    refresh_token = create_refresh_token(identity=str(account["id"]), additional_claims={"role": account["role"]})
     set_cached_account(account["id"], account)
     response = jsonify(
         {
             "message": message,
             "access_token": access_token,
+            "refresh_token": refresh_token,
             "user": account,
         }
     )
@@ -539,7 +541,7 @@ def logout():
     return response, 200
 
 @auth_bp.route("/refresh", methods=["POST"])
-@jwt_required(refresh=True, locations=["cookies"])
+@jwt_required(refresh=True, locations=["cookies", "headers"])
 def refresh_session():
     user_id = get_jwt_identity()
 

@@ -25,10 +25,10 @@ export default function Login() {
     if (!validateAll()) return;
 
     try {
-      const data = await apiRequest<{ access_token: string; token?: string; user: any }>('/login', {
+      const data = await apiRequest<{ access_token: string; token?: string; refresh_token?: string; user: any }>('/login', {
         method: 'POST', body: { email: values.email, senha: values.senha }, token: '',
       });
-      login(data.access_token || data.token || '', data.user);
+      login(data.access_token || data.token || '', data.user, data.refresh_token);
       navigate(defaultAuthenticatedRoute(data.user), { replace: true });
     } catch (err: unknown) {
       const msg = err instanceof ApiError ? err.message : 'Erro ao entrar';

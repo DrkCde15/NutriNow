@@ -47,7 +47,7 @@ export default function Cadastro() {
 
     setLoading(true);
     try {
-      const data = await apiRequest<{ access_token?: string; token?: string; user?: any }>('/cadastro', {
+      const data = await apiRequest<{ access_token?: string; token?: string; refresh_token?: string; user?: any }>('/cadastro', {
         method: 'POST',
         body: {
           nome: values.nome, sobrenome: values.sobrenome,
@@ -63,12 +63,12 @@ export default function Cadastro() {
       });
 
       if (data.access_token || data.token) {
-        login(data.access_token || data.token || '', data.user);
+        login(data.access_token || data.token || '', data.user, data.refresh_token);
       } else {
-        const loginData = await apiRequest<{ access_token: string; user: any }>('/login', {
+        const loginData = await apiRequest<{ access_token: string; refresh_token?: string; user: any }>('/login', {
           method: 'POST', body: { email: values.email, senha: values.senha }, token: '',
         });
-        login(loginData.access_token, loginData.user);
+        login(loginData.access_token, loginData.user, loginData.refresh_token);
       }
       navigate(defaultAuthenticatedRoute({ role: values.role } as any));
     } catch (err: unknown) {

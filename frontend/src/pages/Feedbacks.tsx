@@ -27,8 +27,8 @@ export default function Feedbacks() {
 
   const loadFeedbacks = async () => {
     try {
-      const data = await apiRequest<Feedback[]>('/feedbacks');
-      setList(data);
+      const data = await apiRequest<{ items: Feedback[] }>('/feedbacks');
+      setList(Array.isArray(data?.items) ? data.items : []);
     } catch { /* ok */ }
     setLoading(false);
   };

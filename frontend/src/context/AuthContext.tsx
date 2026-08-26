@@ -1,5 +1,5 @@
 import { createContext, useContext, useReducer, useEffect, useCallback, type ReactNode } from 'react';
-import { getUser, setUser as storageSetUser, setToken as storageSetToken, clearLocalSession, apiRequest, type User } from '../api/client';
+import { getUser, setUser as storageSetUser, setToken as storageSetToken, setRefreshToken, clearLocalSession, apiRequest, type User } from '../api/client';
 
 interface AuthState {
   user: User | null;
@@ -27,7 +27,7 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
 }
 
 interface AuthContextType extends AuthState {
-  login: (token: string, user: User) => void;
+  login: (token: string, user: User, refreshToken?: string) => void;
   logout: () => Promise<void>;
   updateUser: (updates: Partial<User>) => void;
   refreshMe: () => Promise<void>;
@@ -51,8 +51,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('nutrinow:unauthorized', onUnauthorized);
   }, []);
 
-  const login = useCallback((token: string, userData: User) => {
+  const login = useCallback((token: string, userData: User, refreshToken?: string) => {
     storageSetToken(token);
+    if (refreshToken) setRefreshToken(refreshToken);
     storageSetUser(userData);
     dispatch({ type: 'SET_USER', user: userData });
   }, []);
