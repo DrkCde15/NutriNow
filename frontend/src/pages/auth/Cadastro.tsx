@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { apiRequest, defaultAuthenticatedRoute, ApiError, validarConvite, type ConviteInfo } from '../../api/client';
+import { defaultAuthenticatedRoute, validarConvite, type ConviteInfo } from '../../api/client';
 import { useForm, validators } from '../../hooks/useForm';
 import AuthLayout from '../../components/AuthLayout';
 import Icon, { GoogleLogo } from '../../components/Icon';
@@ -16,6 +16,7 @@ export default function Cadastro() {
   const [loading, setLoading] = useState(false);
   const [showSenha, setShowSenha] = useState(false);
   const [conviteFotoError, setConviteFotoError] = useState(false);
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     if (conviteToken) {
@@ -39,17 +40,19 @@ export default function Cadastro() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!validateAll()) return;
+    if (!validateAll() || submittingRef.current) return;
     setApiError('');
+    submittingRef.current = true;
 
     const altura = values.altura ? Number(values.altura) : undefined;
     const peso = values.peso ? Number(values.peso) : undefined;
 
     setLoading(true);
     try {
-      const data = await apiRequest<{ access_token?: string; token?: string; refresh_token?: string; user?: any }>('/cadastro', {
+      const res = await fetch('/api/cadastro', {
         method: 'POST',
-        body: {
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           nome: values.nome, sobrenome: values.sobrenome,
           data_nascimento: values.dataNascimento,
           genero: values.genero, email: values.email, senha: values.senha,
@@ -58,30 +61,46 @@ export default function Cadastro() {
           ja_treinou: values.jaTreinou || 'Nunca treinou',
           role: values.role,
           convite: conviteToken || undefined,
-        },
-        token: '',
+        }),
+        credentials: 'include',
       });
-
+      const data = await res.json();
+      if (!res.ok) {
+        setApiError(data.error || data.message || `Erro ${res.status}`);
+        return;
+      }
       if (data.access_token || data.token) {
         login(data.access_token || data.token || '', data.user, data.refresh_token);
       } else {
-        const loginData = await apiRequest<{ access_token: string; refresh_token?: string; user: any }>('/login', {
-          method: 'POST', body: { email: values.email, senha: values.senha }, token: '',
+        const loginRes = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: values.email, senha: values.senha }),
+          credentials: 'include',
         });
+        const loginData = await loginRes.json();
+        if (!loginRes.ok) {
+          setApiError(loginData.error || 'Erro ao entrar');
+          return;
+        }
         login(loginData.access_token, loginData.user, loginData.refresh_token);
       }
       navigate(defaultAuthenticatedRoute({ role: values.role } as any));
     } catch (err: unknown) {
-      const msg = err instanceof ApiError ? err.message : 'Erro ao cadastrar';
+      const msg = err instanceof DOMException && err.name === 'AbortError'
+        ? 'O servidor demorou para responder'
+        : 'Erro ao cadastrar. Verifique sua conexão e tente novamente.';
       setApiError(msg);
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };
 
   const handleGoogle = async () => {
     try {
-      const data = await apiRequest<{ auth_url: string }>('/auth/login', { method: 'GET', token: '' });
+      const res = await fetch('/api/auth/login', { method: 'GET', credentials: 'include' });
+      const data = await res.json();
       if (data.auth_url) window.location.href = data.auth_url;
     } catch {
       setApiError('Erro ao conectar com o Google');

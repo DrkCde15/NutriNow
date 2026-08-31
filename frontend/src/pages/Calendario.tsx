@@ -121,7 +121,7 @@ export default function Calendario() {
   }, []);
 
   useEffect(() => {
-    if (!user) { navigate('/login', { replace: true }); return; }
+    if (!user) { navigate('/', { replace: true }); return; }
     loadEntries();
     loadNotificacoes();
   }, [user, navigate, loadEntries]);

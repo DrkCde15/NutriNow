@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { apiRequest, defaultAuthenticatedRoute, ApiError } from '../../api/client';
+import { defaultAuthenticatedRoute } from '../../api/client';
 import { useForm, validators } from '../../hooks/useForm';
 import AuthLayout from '../../components/AuthLayout';
 import Icon, { GoogleLogo } from '../../components/Icon';
@@ -10,6 +10,8 @@ export default function Login() {
   const { user, login } = useAuth();
   const navigate = useNavigate();
   const [showSenha, setShowSenha] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const submittingRef = useRef(false);
 
   const { values, errors, touched, handleChange, handleBlur, validateAll, setFieldError } = useForm({
     email: { initial: '', rules: [validators.required('Informe o email'), validators.email()] },
@@ -18,27 +20,54 @@ export default function Login() {
 
   useEffect(() => {
     if (user) navigate(defaultAuthenticatedRoute(user), { replace: true });
-  }, [user]);
+  }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateAll()) return;
+    if (!validateAll() || submittingRef.current) return;
+    submittingRef.current = true;
+    setLoading(true);
 
     try {
-      const data = await apiRequest<{ access_token: string; token?: string; refresh_token?: string; user: any }>('/login', {
-        method: 'POST', body: { email: values.email, senha: values.senha }, token: '',
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: values.email, senha: values.senha }),
+        credentials: 'include',
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        let errorMsg = `Erro ${res.status}`;
+        try {
+          const errData = await res.json();
+          errorMsg = errData.error || errData.message || errorMsg;
+        } catch { /* ignore parse error */ }
+        setFieldError('senha', errorMsg);
+        return;
+      }
+
+      const data = await res.json();
       login(data.access_token || data.token || '', data.user, data.refresh_token);
-      navigate(defaultAuthenticatedRoute(data.user), { replace: true });
     } catch (err: unknown) {
-      const msg = err instanceof ApiError ? err.message : 'Erro ao entrar';
+      const msg = err instanceof DOMException && err.name === 'AbortError'
+        ? 'O servidor demorou para responder. Tente novamente.'
+        : 'Erro ao entrar. Verifique sua conexão e tente novamente.';
       setFieldError('senha', msg);
+    } finally {
+      submittingRef.current = false;
+      setLoading(false);
     }
   };
 
   const handleGoogle = async () => {
     try {
-      const data = await apiRequest<{ auth_url: string }>('/auth/login', { method: 'GET', token: '' });
+      const res = await fetch('/api/auth/login', { method: 'GET', credentials: 'include' });
+      const data = await res.json();
       if (data.auth_url) window.location.href = data.auth_url;
     } catch {
       setFieldError('email', 'Erro ao conectar com o Google');
@@ -96,8 +125,8 @@ export default function Login() {
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <Link to="/esqueci-senha" className="text-primary" style={{ fontSize: '.9rem', fontWeight: 700 }}>Esqueci minha senha</Link>
         </div>
-        <button className="btn btn-primary" type="submit">
-          <Icon name="login" /> Entrar
+        <button className="btn btn-primary" type="submit" disabled={loading}>
+          {loading ? 'Entrando...' : <><Icon name="login" /> Entrar</>}
         </button>
         <div className="divider"><span>Ou continue com</span></div>
         <button className="btn btn-secondary" type="button" onClick={handleGoogle}>

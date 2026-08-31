@@ -10,7 +10,7 @@ interface Props {
 
 export default function PremiumRoute({ children, requireProfessional }: Props) {
   const { user, isPremium, isProfessional } = useAuth();
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/" replace />;
   if (requireProfessional && !isProfessional) return <Navigate to="/" replace />;
   if (!isPremium) return <PremiumModal />;
   return <>{children}</>;

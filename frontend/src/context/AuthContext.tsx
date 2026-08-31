@@ -28,7 +28,7 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
 
 interface AuthContextType extends AuthState {
   login: (token: string, user: User, refreshToken?: string) => void;
-  logout: () => Promise<void>;
+  logout: (redirectTo?: string) => void;
   updateUser: (updates: Partial<User>) => void;
   refreshMe: () => Promise<void>;
   isPremium: boolean;
@@ -45,12 +45,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SET_USER', user: stored });
   }, []);
 
-  useEffect(() => {
-    const onUnauthorized = () => dispatch({ type: 'LOGOUT' });
-    window.addEventListener('nutrinow:unauthorized', onUnauthorized);
-    return () => window.removeEventListener('nutrinow:unauthorized', onUnauthorized);
-  }, []);
-
   const login = useCallback((token: string, userData: User, refreshToken?: string) => {
     storageSetToken(token);
     if (refreshToken) setRefreshToken(refreshToken);
@@ -58,13 +52,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SET_USER', user: userData });
   }, []);
 
-  const logout = useCallback(async () => {
-    try {
-      await apiRequest('/logout', { method: 'POST' });
-    } catch { /* ignore */ }
+  const logout = useCallback(async (redirectTo?: string) => {
     clearLocalSession();
     dispatch({ type: 'LOGOUT' });
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5000);
+      await fetch('/api/logout', {
+        method: 'POST',
+        credentials: 'include',
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+    } catch { /* backend may be down — still redirect */ }
+    window.location.replace(redirectTo || '/');
   }, []);
+
+  useEffect(() => {
+    const onUnauthorized = () => logout();
+    window.addEventListener('nutrinow:unauthorized', onUnauthorized);
+    return () => window.removeEventListener('nutrinow:unauthorized', onUnauthorized);
+  }, [logout]);
 
   const updateUser = useCallback((updates: Partial<User>) => {
     dispatch({ type: 'MERGE_USER', updates });

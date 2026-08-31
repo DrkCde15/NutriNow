@@ -30,9 +30,9 @@ export default function Chat() {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    if (!user) { navigate('/login', { replace: true }); return; }
+    if (!user) { navigate('/', { replace: true }); return; }
     loadSessions();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)');

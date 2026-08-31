@@ -35,9 +35,9 @@ export default function Perfil() {
   });
 
   useEffect(() => {
-    if (!user) { navigate('/login', { replace: true }); return; }
+    if (!user) { navigate('/', { replace: true }); return; }
     loadProfile();
-  }, []);
+  }, [user]);
 
   // Sincroniza o formulário com os dados completos vindos de /perfil
   // (o payload de login não traz genero, dataNascimento, meta, ja_treinou).
@@ -63,7 +63,6 @@ export default function Perfil() {
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         logout();
-        navigate('/login', { replace: true });
         return;
       }
     }
@@ -241,7 +240,7 @@ export default function Perfil() {
             )}
 
             <div className="modal-actions" style={{ borderTop: '1px solid var(--border)', paddingTop: '1.25rem' }}>
-              <button className="btn btn-secondary" type="button" onClick={logout}><Icon name="logout" /> Sair da conta</button>
+              <button className="btn btn-secondary" type="button" onClick={() => logout()}><Icon name="logout" /> Sair da conta</button>
               <button className="btn btn-primary" type="submit" disabled={loading}>
                 {loading ? 'Salvando...' : <><Icon name="save" /> Salvar alterações</>}
               </button>

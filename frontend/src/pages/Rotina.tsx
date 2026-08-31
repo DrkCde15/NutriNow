@@ -27,9 +27,9 @@ export default function Rotina() {
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    if (!user) { navigate('/login', { replace: true }); return; }
+    if (!user) { navigate('/', { replace: true }); return; }
     loadAll();
-  }, []);
+  }, [user]);
 
   const loadAll = async () => {
     setLoading(true);

@@ -79,7 +79,7 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user) { navigate('/login', { replace: true }); return; }
+    if (!user) { navigate('/', { replace: true }); return; }
     let active = true;
     (async () => {
       try {
@@ -88,7 +88,6 @@ export default function Dashboard() {
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
           logout();
-          navigate('/login', { replace: true });
           return;
         }
         if (active) setError('Não foi possível carregar o dashboard.');
@@ -97,7 +96,7 @@ export default function Dashboard() {
       }
     })();
     return () => { active = false; };
-  }, []);
+  }, [user]);
 
   if (loading) {
     return (

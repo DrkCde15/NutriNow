@@ -22,9 +22,9 @@ export default function Pacientes() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) { navigate('/login', { replace: true }); return; }
+    if (!user) { navigate('/', { replace: true }); return; }
     loadPatients();
-  }, []);
+  }, [user]);
 
   const loadPatients = async () => {
     try {

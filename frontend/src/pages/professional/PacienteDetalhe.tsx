@@ -27,9 +27,9 @@ export default function PacienteDetalhe() {
   const [obsSaved, setObsSaved] = useState(false);
 
   useEffect(() => {
-    if (!user) { navigate('/login', { replace: true }); return; }
+    if (!user) { navigate('/', { replace: true }); return; }
     loadPatient();
-  }, []);
+  }, [user]);
 
   const loadPatient = async () => {
     try {

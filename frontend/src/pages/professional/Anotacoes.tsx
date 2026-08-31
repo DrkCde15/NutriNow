@@ -26,9 +26,9 @@ export default function Anotacoes() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!user) { navigate('/login', { replace: true }); return; }
+    if (!user) { navigate('/', { replace: true }); return; }
     loadNotes();
-  }, []);
+  }, [user]);
 
   const loadNotes = async () => {
     try {
